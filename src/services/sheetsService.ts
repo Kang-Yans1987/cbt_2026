@@ -1,4 +1,5 @@
 import type {
+  AccessCredentials,
   ExamPackageData,
   ExamSessionSlot,
   ExamSubmission,
@@ -136,9 +137,12 @@ export async function pullAllFromSheets(
   students: Student[];
   submissions: ExamSubmission[];
   schoolLogoUrl?: string;
+  homeThumbnailUrl?: string;
   appTitle?: string;
   schoolName?: string;
   examSessions?: ExamSessionSlot[];
+  adminCredentials?: AccessCredentials;
+  proctorCredentials?: AccessCredentials;
 }> {
   const metadata = await fetchSpreadsheetMetadata(spreadsheetId, accessToken);
   const tabSet = new Set(metadata.sheetNames);
@@ -189,6 +193,15 @@ export async function pullAllFromSheets(
     firstSubjRow[16],
     undefined
   );
+  const adminCredentials = safeJsonParse<AccessCredentials | undefined>(
+    firstSubjRow[17],
+    undefined
+  );
+  const proctorCredentials = safeJsonParse<AccessCredentials | undefined>(
+    firstSubjRow[18],
+    undefined
+  );
+  const homeThumbnailUrl = firstSubjRow[19] || undefined;
 
   const questions: Question[] = soalRows
     .slice(1)
@@ -261,9 +274,12 @@ export async function pullAllFromSheets(
     students,
     submissions,
     schoolLogoUrl,
+    homeThumbnailUrl,
     appTitle,
     schoolName,
     examSessions,
+    adminCredentials,
+    proctorCredentials,
   };
 }
 
@@ -317,6 +333,9 @@ export async function pushAllToSheets(
       'Judul_Aplikasi',
       'Kamera_Wajib',
       'Sesi_JSON',
+      'Admin_Auth_JSON',
+      'Proktor_Auth_JSON',
+      'Thumbnail_Beranda',
     ],
     ...pkg.subjects.map((s, idx) => [
       s.id,
@@ -336,6 +355,13 @@ export async function pushAllToSheets(
       idx === 0 ? pkg.appTitle || 'AksaraCBT' : '',
       s.cameraRequired !== false,
       idx === 0 ? JSON.stringify(pkg.examSessions || []) : '',
+      idx === 0 && pkg.adminCredentials
+        ? JSON.stringify(pkg.adminCredentials)
+        : '',
+      idx === 0 && pkg.proctorCredentials
+        ? JSON.stringify(pkg.proctorCredentials)
+        : '',
+      idx === 0 ? pkg.homeThumbnailUrl || '' : '',
     ]),
   ];
 

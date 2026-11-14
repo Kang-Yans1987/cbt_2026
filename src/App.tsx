@@ -11,6 +11,8 @@ import type {
 import { DEFAULT_SPREADSHEET_ID } from './types/exam';
 import {
   createInitialPackage,
+  DEFAULT_ADMIN_CREDENTIALS,
+  DEFAULT_PROCTOR_CREDENTIALS,
   INITIAL_QUESTIONS,
   INITIAL_STUDENTS,
   INITIAL_SUBMISSIONS,
@@ -39,6 +41,7 @@ import { StudentExamRunner } from './components/StudentExamRunner';
 import { StudentResultView } from './components/StudentResultView';
 import { AdminDashboard, type AdminSection } from './components/AdminDashboard';
 import { ProctorStandaloneView } from './components/ProctorStandaloneView';
+import { RoleLoginModal } from './components/RoleLoginModal';
 import { OfflineIndicator } from './components/PWAControls';
 
 type AppView = 'portal' | 'exam' | 'result' | 'admin' | 'proctor';
@@ -46,6 +49,9 @@ type AppView = 'portal' | 'exam' | 'result' | 'admin' | 'proctor';
 export default function App() {
   const isOnline = useOnlineStatus();
   const [view, setView] = useState<AppView>('portal');
+  const [loginPromptRole, setLoginPromptRole] = useState<
+    'admin' | 'proctor' | null
+  >(null);
   const [adminInitialSection, setAdminInitialSection] =
     useState<AdminSection>('analytics');
   const [examPackage, setExamPackage] = useState<ExamPackageData>(() =>
@@ -319,6 +325,14 @@ export default function App() {
         pulled.schoolLogoUrl !== undefined
           ? pulled.schoolLogoUrl
           : examPackage.schoolLogoUrl,
+      homeThumbnailUrl:
+        pulled.homeThumbnailUrl !== undefined
+          ? pulled.homeThumbnailUrl
+          : examPackage.homeThumbnailUrl,
+      adminCredentials:
+        pulled.adminCredentials || examPackage.adminCredentials,
+      proctorCredentials:
+        pulled.proctorCredentials || examPackage.proctorCredentials,
       subjects:
         pulled.subjects.length > 0 ? pulled.subjects : examPackage.subjects,
       questions:
@@ -551,6 +565,7 @@ export default function App() {
           appTitle={appTitle}
           schoolName={schoolName}
           schoolLogoUrl={schoolLogoUrl}
+          homeThumbnailUrl={examPackage.homeThumbnailUrl || ''}
           subjects={examPackage.subjects}
           students={examPackage.students}
           questionCountBySubject={questionCountBySubject}
@@ -565,13 +580,8 @@ export default function App() {
             setActiveSubject(subject);
             setView('exam');
           }}
-          onOpenAdmin={() => {
-            setAdminInitialSection('analytics');
-            setView('admin');
-          }}
-          onOpenProctor={() => {
-            setView('proctor');
-          }}
+          onOpenAdmin={() => setLoginPromptRole('admin')}
+          onOpenProctor={() => setLoginPromptRole('proctor')}
         />
       )}
 
@@ -652,6 +662,30 @@ export default function App() {
           onFactoryReset={handleFactoryReset}
         />
       )}
+
+      <RoleLoginModal
+        role={loginPromptRole}
+        expectedCredentials={
+          loginPromptRole === 'admin'
+            ? examPackage.adminCredentials || DEFAULT_ADMIN_CREDENTIALS
+            : examPackage.proctorCredentials || DEFAULT_PROCTOR_CREDENTIALS
+        }
+        defaultCredentials={
+          loginPromptRole === 'admin'
+            ? DEFAULT_ADMIN_CREDENTIALS
+            : DEFAULT_PROCTOR_CREDENTIALS
+        }
+        onSuccess={(role) => {
+          setLoginPromptRole(null);
+          if (role === 'admin') {
+            setAdminInitialSection('analytics');
+            setView('admin');
+          } else {
+            setView('proctor');
+          }
+        }}
+        onClose={() => setLoginPromptRole(null)}
+      />
 
       <OfflineIndicator pendingSyncCount={pendingSyncCount} />
     </>

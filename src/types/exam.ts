@@ -67,6 +67,11 @@ export interface ExamSessionSlot {
   proctorName?: string;
 }
 
+export interface AccessCredentials {
+  username: string;
+  password: string;
+}
+
 export interface Student {
   id: string;
   participantNumber: string;
@@ -180,6 +185,9 @@ export interface ExamPackageData {
   appTitle?: string;
   schoolName?: string;
   schoolLogoUrl?: string;
+  homeThumbnailUrl?: string;
+  adminCredentials?: AccessCredentials;
+  proctorCredentials?: AccessCredentials;
   subjects: SubjectConfig[];
   questions: Question[];
   students: Student[];

@@ -10,11 +10,13 @@ import {
 import type { Student, SubjectConfig } from '../types/exam';
 import { PWAInstallButton } from './PWAControls';
 import { SchoolLogo } from './SchoolLogo';
+import defaultBerandaThumbnail from '../assets/images/beranda_cbt_thumbnail_1794628073884.jpg';
 
 interface PortalEntryProps {
   appTitle: string;
   schoolName: string;
   schoolLogoUrl: string;
+  homeThumbnailUrl?: string;
   subjects: SubjectConfig[];
   students: Student[];
   questionCountBySubject: Record<string, number>;
@@ -30,6 +32,7 @@ export const PortalEntry: React.FC<PortalEntryProps> = ({
   appTitle,
   schoolName,
   schoolLogoUrl,
+  homeThumbnailUrl,
   subjects,
   students,
   questionCountBySubject,
@@ -41,6 +44,7 @@ export const PortalEntry: React.FC<PortalEntryProps> = ({
   onOpenProctor,
 }) => {
   const activeSubjects = subjects.filter((s) => s.active);
+  const [thumbFailed, setThumbFailed] = useState(false);
   const [participantNumber, setParticipantNumber] = useState(
     students[0]?.participantNumber || ''
   );
@@ -55,6 +59,8 @@ export const PortalEntry: React.FC<PortalEntryProps> = ({
   const [activeInfoTab, setActiveInfoTab] = useState<'peserta' | 'panduan'>(
     'peserta'
   );
+
+  const effectiveThumbSrc = homeThumbnailUrl || defaultBerandaThumbnail;
 
   const selectedSubject =
     subjects.find((s) => s.id === selectedSubjectId) || subjects[0];
@@ -401,60 +407,45 @@ export const PortalEntry: React.FC<PortalEntryProps> = ({
               className="lg:col-span-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8 flex flex-col justify-between"
             >
               <div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 sm:p-5">
-                  <svg
-                    viewBox="0 0 360 170"
-                    className="w-full h-auto"
-                    aria-hidden="true"
-                  >
-                    <rect
-                      x="8"
-                      y="10"
-                      width="344"
-                      height="150"
-                      rx="10"
-                      fill="#FFFFFF"
-                      stroke="#CBD5E1"
-                      strokeWidth="1.5"
+                <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-100 aspect-video">
+                  {!thumbFailed ? (
+                    <img
+                      src={effectiveThumbSrc}
+                      alt={`Suasana ruang ujian komputer ${schoolName || 'sekolah'}`}
+                      referrerPolicy="no-referrer"
+                      onError={() => setThumbFailed(true)}
+                      className="h-full w-full object-cover"
                     />
-                    <rect x="24" y="26" width="120" height="10" rx="5" fill="#1E293B" />
-                    <rect x="24" y="44" width="180" height="7" rx="3.5" fill="#94A3B8" />
-                    <rect
-                      x="24"
-                      y="68"
-                      width="144"
-                      height="74"
-                      rx="8"
-                      fill="#F8FAFC"
-                      stroke="#E2E8F0"
-                    />
-                    <rect x="36" y="80" width="84" height="8" rx="4" fill="#1D4ED8" />
-                    <rect x="36" y="96" width="112" height="6" rx="3" fill="#CBD5E1" />
-                    <rect x="36" y="110" width="96" height="6" rx="3" fill="#CBD5E1" />
-                    <rect x="36" y="124" width="60" height="6" rx="3" fill="#CBD5E1" />
-                    <rect
-                      x="184"
-                      y="68"
-                      width="152"
-                      height="34"
-                      rx="6"
-                      fill="#EFF6FF"
-                      stroke="#BFDBFE"
-                    />
-                    <circle cx="202" cy="85" r="7" fill="#1D4ED8" />
-                    <rect x="216" y="81" width="102" height="7" rx="3.5" fill="#1E3A8A" />
-                    <rect
-                      x="184"
-                      y="108"
-                      width="152"
-                      height="34"
-                      rx="6"
-                      fill="#ECFDF5"
-                      stroke="#A7F3D0"
-                    />
-                    <circle cx="202" cy="125" r="7" fill="#059669" />
-                    <rect x="216" y="121" width="92" height="7" rx="3.5" fill="#065F46" />
-                  </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 360 202"
+                      className="h-full w-full"
+                      aria-hidden="true"
+                    >
+                      <rect width="360" height="202" fill="#F1F5F9" />
+                      <rect
+                        x="20"
+                        y="20"
+                        width="320"
+                        height="162"
+                        rx="10"
+                        fill="#FFFFFF"
+                        stroke="#CBD5E1"
+                      />
+                      <rect x="40" y="42" width="130" height="12" rx="6" fill="#1E293B" />
+                      <rect x="40" y="62" width="190" height="8" rx="4" fill="#94A3B8" />
+                      <rect x="40" y="88" width="135" height="72" rx="8" fill="#EFF6FF" />
+                      <rect x="188" y="88" width="132" height="72" rx="8" fill="#ECFDF5" />
+                    </svg>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/40 to-transparent p-3.5 sm:p-4 text-white">
+                    <p className="text-[11px] font-medium text-slate-200">
+                      Portal Asesmen Digital TKA &amp; AKM
+                    </p>
+                    <p className="text-sm font-semibold leading-snug truncate">
+                      {schoolName || selectedSubject?.schoolName || 'Sekolah Penyelenggara'}
+                    </p>
+                  </div>
                 </div>
 
                 <h2 className="mt-5 text-lg font-semibold text-slate-900">

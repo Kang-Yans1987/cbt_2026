@@ -4,16 +4,26 @@ import {
   CalendarClock,
   CheckSquare,
   Download,
+  Eye,
+  EyeOff,
   FileSpreadsheet,
+  Image as ImageIcon,
+  KeyRound,
   Layers,
   Plus,
   Search,
+  ShieldCheck,
   Trash2,
   Upload,
   UserPlus,
   X,
 } from 'lucide-react';
-import type { ExamSessionSlot, Student, SubjectConfig } from '../../types/exam';
+import type {
+  AccessCredentials,
+  ExamSessionSlot,
+  Student,
+  SubjectConfig,
+} from '../../types/exam';
 import { compressImageFileToDataUrl } from '../../utils/imageHelper';
 import {
   generateStudentCsvTemplate,
@@ -21,15 +31,24 @@ import {
 } from '../../utils/studentCsv';
 import { SchoolLogo } from '../SchoolLogo';
 import { ConfirmDialog } from '../ConfirmDialog';
+import defaultBerandaThumbnail from '../../assets/images/beranda_cbt_thumbnail_1794628073884.jpg';
 
 interface SubjectAndStudentTabProps {
   appTitle: string;
   schoolName: string;
   schoolLogoUrl: string;
+  homeThumbnailUrl: string;
+  adminCredentials: AccessCredentials;
+  proctorCredentials: AccessCredentials;
   onUpdateBranding: (branding: {
     appTitle: string;
     schoolName: string;
     schoolLogoUrl: string;
+    homeThumbnailUrl: string;
+  }) => void;
+  onUpdateAccessCredentials: (next: {
+    adminCredentials: AccessCredentials;
+    proctorCredentials: AccessCredentials;
   }) => void;
   subjects: SubjectConfig[];
   students: Student[];
@@ -46,7 +65,11 @@ export const SubjectAndStudentTab: React.FC<SubjectAndStudentTabProps> = ({
   appTitle,
   schoolName,
   schoolLogoUrl,
+  homeThumbnailUrl,
+  adminCredentials,
+  proctorCredentials,
   onUpdateBranding,
+  onUpdateAccessCredentials,
   subjects,
   students,
   examSessions,
@@ -66,8 +89,23 @@ export const SubjectAndStudentTab: React.FC<SubjectAndStudentTabProps> = ({
   const [draftTitle, setDraftTitle] = useState(appTitle);
   const [draftSchool, setDraftSchool] = useState(schoolName);
   const [draftLogo, setDraftLogo] = useState(schoolLogoUrl);
+  const [draftThumb, setDraftThumb] = useState(homeThumbnailUrl);
   const [brandingError, setBrandingError] = useState<string | null>(null);
   const [brandingSaved, setBrandingSaved] = useState(false);
+
+  // Admin & Pengawas access credentials editor
+  const [draftAdminUser, setDraftAdminUser] = useState(adminCredentials.username);
+  const [draftAdminPass, setDraftAdminPass] = useState(adminCredentials.password);
+  const [draftProctorUser, setDraftProctorUser] = useState(
+    proctorCredentials.username
+  );
+  const [draftProctorPass, setDraftProctorPass] = useState(
+    proctorCredentials.password
+  );
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [showProctorPass, setShowProctorPass] = useState(false);
+  const [credError, setCredError] = useState<string | null>(null);
+  const [credSaved, setCredSaved] = useState(false);
 
   // Exam session editor state
   const [editingSession, setEditingSession] = useState<ExamSessionSlot | null>(
@@ -101,12 +139,20 @@ export const SubjectAndStudentTab: React.FC<SubjectAndStudentTabProps> = ({
   const [autoRoomPrefix, setAutoRoomPrefix] = useState('Ruang');
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
-  // Keep branding drafts synchronized when data is pulled from Sheets or restored
+  // Keep branding & credential drafts synchronized when data is pulled from Sheets or restored
   useEffect(() => {
     setDraftTitle(appTitle);
     setDraftSchool(schoolName);
     setDraftLogo(schoolLogoUrl);
-  }, [appTitle, schoolName, schoolLogoUrl]);
+    setDraftThumb(homeThumbnailUrl);
+  }, [appTitle, schoolName, schoolLogoUrl, homeThumbnailUrl]);
+
+  useEffect(() => {
+    setDraftAdminUser(adminCredentials.username);
+    setDraftAdminPass(adminCredentials.password);
+    setDraftProctorUser(proctorCredentials.username);
+    setDraftProctorPass(proctorCredentials.password);
+  }, [adminCredentials, proctorCredentials]);
 
   useEffect(() => {
     if (examSessions.length > 0) {
@@ -192,6 +238,28 @@ export const SubjectAndStudentTab: React.FC<SubjectAndStudentTabProps> = ({
     }
   };
 
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBrandingError(null);
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxDimension: 960,
+        quality: 0.84,
+      });
+      setDraftThumb(dataUrl);
+      setBrandingSaved(false);
+    } catch (err) {
+      setBrandingError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal memproses gambar thumbnail beranda.'
+      );
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   const handleSaveBranding = (e: React.FormEvent) => {
     e.preventDefault();
     if (!draftTitle.trim() || !draftSchool.trim()) {
@@ -203,9 +271,37 @@ export const SubjectAndStudentTab: React.FC<SubjectAndStudentTabProps> = ({
       appTitle: draftTitle.trim(),
       schoolName: draftSchool.trim(),
       schoolLogoUrl: draftLogo.trim(),
+      homeThumbnailUrl: draftThumb.trim(),
     });
     setBrandingSaved(true);
     setTimeout(() => setBrandingSaved(false), 3000);
+  };
+
+  const handleSaveCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCredError(null);
+
+    if (!draftAdminUser.trim() || !draftProctorUser.trim()) {
+      setCredError('Username Admin dan Pengawas tidak boleh kosong.');
+      return;
+    }
+    if (draftAdminPass.length < 4 || draftProctorPass.length < 4) {
+      setCredError('Password Admin dan Pengawas minimal 4 karakter.');
+      return;
+    }
+
+    onUpdateAccessCredentials({
+      adminCredentials: {
+        username: draftAdminUser.trim(),
+        password: draftAdminPass,
+      },
+      proctorCredentials: {
+        username: draftProctorUser.trim(),
+        password: draftProctorPass,
+      },
+    });
+    setCredSaved(true);
+    setTimeout(() => setCredSaved(false), 3000);
   };
 
   const handleNewSubject = () => {
@@ -521,12 +617,214 @@ export const SubjectAndStudentTab: React.FC<SubjectAndStudentTabProps> = ({
             </div>
           </div>
 
+          <div className="border-t border-slate-100 pt-4 grid gap-4 sm:grid-cols-2 items-center">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Thumbnail Foto Beranda (Opsional — Ganti Gambar Ruang Ujian)
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  <span>Unggah Thumbnail Beranda</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailUpload}
+                    className="hidden"
+                  />
+                </label>
+                {draftThumb && (
+                  <button
+                    type="button"
+                    onClick={() => setDraftThumb('')}
+                    className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Gunakan Foto Bawaan
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <img
+                src={draftThumb || defaultBerandaThumbnail}
+                alt="Pratinjau thumbnail beranda"
+                className="h-16 w-28 shrink-0 rounded-lg border border-slate-200 object-cover bg-slate-100"
+              />
+              <span className="text-xs text-slate-500">
+                {draftThumb
+                  ? 'Menggunakan thumbnail kustom sekolah.'
+                  : 'Menggunakan thumbnail foto ruang CBT bawaan.'}
+              </span>
+            </div>
+          </div>
+
           <div className="flex justify-end">
             <button
               type="submit"
               className="min-h-[40px] rounded-lg bg-blue-700 px-5 py-2 text-xs font-semibold text-white hover:bg-blue-800"
             >
-              Simpan Logo & Identitas
+              Simpan Logo, Thumbnail &amp; Identitas
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* Admin & Proctor Credentials Settings */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
+        <div className="flex items-start gap-3 border-b border-slate-100 pb-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+            <KeyRound className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              Keamanan Akses Admin &amp; Pengawas (Username &amp; Password)
+            </h2>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-600">
+              Atur kredensial masuk untuk panel Admin &amp; Guru serta akun khusus Ruang Pengawas / Proktor.
+            </p>
+          </div>
+        </div>
+
+        {credError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-800">
+            {credError}
+          </div>
+        )}
+        {credSaved && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">
+            Username dan password Admin serta Pengawas berhasil diperbarui.
+          </div>
+        )}
+
+        <form onSubmit={handleSaveCredentials} className="space-y-4">
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* Admin Account */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <KeyRound className="h-4 w-4 text-slate-700" />
+                Akun Akses Admin &amp; Guru
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Username Admin
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={draftAdminUser}
+                  onChange={(e) => {
+                    setDraftAdminUser(e.target.value);
+                    setCredSaved(false);
+                  }}
+                  className="mt-1 w-full min-h-[40px] rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm"
+                  placeholder="admin"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Password Admin
+                </label>
+                <div className="relative mt-1">
+                  <input
+                    type={showAdminPass ? 'text' : 'password'}
+                    required
+                    minLength={4}
+                    value={draftAdminPass}
+                    onChange={(e) => {
+                      setDraftAdminPass(e.target.value);
+                      setCredSaved(false);
+                    }}
+                    className="w-full min-h-[40px] rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 font-mono text-sm"
+                    placeholder="Minimal 4 karakter"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPass((prev) => !prev)}
+                    aria-label={
+                      showAdminPass
+                        ? 'Sembunyikan password admin'
+                        : 'Lihat password admin'
+                    }
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700"
+                  >
+                    {showAdminPass ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Proctor Account */}
+            <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <ShieldCheck className="h-4 w-4 text-blue-700" />
+                Akun Akses Pengawas / Proktor
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Username Pengawas
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={draftProctorUser}
+                  onChange={(e) => {
+                    setDraftProctorUser(e.target.value);
+                    setCredSaved(false);
+                  }}
+                  className="mt-1 w-full min-h-[40px] rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm"
+                  placeholder="pengawas"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Password Pengawas
+                </label>
+                <div className="relative mt-1">
+                  <input
+                    type={showProctorPass ? 'text' : 'password'}
+                    required
+                    minLength={4}
+                    value={draftProctorPass}
+                    onChange={(e) => {
+                      setDraftProctorPass(e.target.value);
+                      setCredSaved(false);
+                    }}
+                    className="w-full min-h-[40px] rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 font-mono text-sm"
+                    placeholder="Minimal 4 karakter"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowProctorPass((prev) => !prev)}
+                    aria-label={
+                      showProctorPass
+                        ? 'Sembunyikan password pengawas'
+                        : 'Lihat password pengawas'
+                    }
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700"
+                  >
+                    {showProctorPass ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="min-h-[40px] rounded-lg bg-slate-900 px-5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              Simpan User &amp; Password Akses
             </button>
           </div>
         </form>

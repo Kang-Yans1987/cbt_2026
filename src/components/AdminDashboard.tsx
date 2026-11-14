@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type {
+  AccessCredentials,
   DrivePdfFile,
   ExamPackageData,
   ExamSessionSlot,
@@ -21,7 +22,11 @@ import type {
   Student,
   SubjectConfig,
 } from '../types/exam';
-import { INITIAL_EXAM_SESSIONS } from '../data/defaultExamData';
+import {
+  DEFAULT_ADMIN_CREDENTIALS,
+  DEFAULT_PROCTOR_CREDENTIALS,
+  INITIAL_EXAM_SESSIONS,
+} from '../data/defaultExamData';
 import type { SpreadsheetMetadata } from '../services/sheetsService';
 import { AnalyticsMonitorTab } from './admin/AnalyticsMonitorTab';
 import { ProctorControlTab } from './admin/ProctorControlTab';
@@ -117,6 +122,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     examPackage.subjects[0]?.schoolName ||
     'SMA Negeri 1 Nusantara';
   const schoolLogoUrl = examPackage.schoolLogoUrl || '';
+  const homeThumbnailUrl = examPackage.homeThumbnailUrl || '';
+  const adminCredentials =
+    examPackage.adminCredentials || DEFAULT_ADMIN_CREDENTIALS;
+  const proctorCredentials =
+    examPackage.proctorCredentials || DEFAULT_PROCTOR_CREDENTIALS;
   const examSessions =
     examPackage.examSessions && examPackage.examSessions.length > 0
       ? examPackage.examSessions
@@ -225,16 +235,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     appTitle: string;
     schoolName: string;
     schoolLogoUrl: string;
+    homeThumbnailUrl: string;
   }) => {
     onUpdatePackage({
       ...examPackage,
       appTitle: branding.appTitle,
       schoolName: branding.schoolName,
       schoolLogoUrl: branding.schoolLogoUrl,
+      homeThumbnailUrl: branding.homeThumbnailUrl,
       subjects: examPackage.subjects.map((s) => ({
         ...s,
         schoolName: branding.schoolName,
       })),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const handleUpdateAccessCredentials = (next: {
+    adminCredentials: AccessCredentials;
+    proctorCredentials: AccessCredentials;
+  }) => {
+    onUpdatePackage({
+      ...examPackage,
+      adminCredentials: next.adminCredentials,
+      proctorCredentials: next.proctorCredentials,
       updatedAt: new Date().toISOString(),
     });
   };
@@ -409,7 +433,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               appTitle={appTitle}
               schoolName={schoolName}
               schoolLogoUrl={schoolLogoUrl}
+              homeThumbnailUrl={homeThumbnailUrl}
+              adminCredentials={adminCredentials}
+              proctorCredentials={proctorCredentials}
               onUpdateBranding={handleUpdateBranding}
+              onUpdateAccessCredentials={handleUpdateAccessCredentials}
               subjects={examPackage.subjects}
               students={examPackage.students}
               examSessions={examSessions}

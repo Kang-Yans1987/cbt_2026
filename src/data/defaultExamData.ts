@@ -1,6 +1,7 @@
 import {
   DEFAULT_DRIVE_FOLDER_ID,
   DEFAULT_SPREADSHEET_ID,
+  type AccessCredentials,
   type ExamPackageData,
   type ExamSessionSlot,
   type ExamSubmission,
@@ -8,6 +9,16 @@ import {
   type Student,
   type SubjectConfig,
 } from '../types/exam';
+
+export const DEFAULT_ADMIN_CREDENTIALS: AccessCredentials = {
+  username: 'admin',
+  password: 'admin2026',
+};
+
+export const DEFAULT_PROCTOR_CREDENTIALS: AccessCredentials = {
+  username: 'pengawas',
+  password: 'proktor2026',
+};
 
 function svgDataUri(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
@@ -459,6 +470,9 @@ export function createInitialPackage(): ExamPackageData {
     appTitle: 'AksaraCBT',
     schoolName: 'SMA Negeri 1 Nusantara',
     schoolLogoUrl: '',
+    homeThumbnailUrl: '',
+    adminCredentials: { ...DEFAULT_ADMIN_CREDENTIALS },
+    proctorCredentials: { ...DEFAULT_PROCTOR_CREDENTIALS },
     subjects: INITIAL_SUBJECTS,
     questions: INITIAL_QUESTIONS,
     students: INITIAL_STUDENTS,
