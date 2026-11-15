@@ -24,7 +24,7 @@ export class ErrorBoundary extends React.Component<
   }
 
   override componentDidCatch(error: Error) {
-    console.error('AksaraCBT ErrorBoundary:', error);
+    console.error('DutawangiCBT ErrorBoundary:', error);
   }
 
   override render() {

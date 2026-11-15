@@ -1,6 +1,6 @@
 {
-  "name": "AksaraCBT — Sistem Ujian Online AKM & TKA",
-  "description": "Aplikasi ujian online (CBT) terintegrasi Google Sheets & Google Drive dengan enkripsi AES-256, sistem anti-tab proctoring, mode offline PWA, analitik real-time, dan korektor asisten AI.",
+  "name": "DutawangiCBT — Sistem Ujian Online AKM & TKA",
+  "description": "Aplikasi ujian online (CBT) terintegrasi Google Sheets & Google Drive dengan enkripsi AES-256, mode offline PWA, analitik real-time, dan asisten AI.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

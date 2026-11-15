@@ -1,19 +1,33 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { Eye, EyeOff, KeyRound, ShieldCheck, X } from 'lucide-react';
-import type { AccessCredentials } from '../types/exam';
+import type {
+  AccessCredentials,
+  AdminSectionId,
+  TeacherAccount,
+} from '../types/exam';
+import { DEFAULT_TEACHER_ALLOWED_MENUS } from './admin/TeachersManagerTab';
+
+export interface AuthenticatedActor {
+  role: 'admin' | 'teacher' | 'proctor';
+  displayName: string;
+  teacherId?: string;
+  subjectSpecialty?: string;
+  allowedMenus?: AdminSectionId[];
+}
 
 interface RoleLoginModalProps {
   role: 'admin' | 'proctor' | null;
   expectedCredentials: AccessCredentials;
-  defaultCredentials: AccessCredentials;
-  onSuccess: (role: 'admin' | 'proctor') => void;
+  teacherAccounts?: TeacherAccount[];
+  onSuccess: (actor: AuthenticatedActor) => void;
   onClose: () => void;
 }
 
 export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
   role,
   expectedCredentials,
-  defaultCredentials,
+  teacherAccounts = [],
   onSuccess,
   onClose,
 }) => {
@@ -31,16 +45,12 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
 
   if (!role) return null;
 
-  const isUsingDefault =
-    expectedCredentials.username === defaultCredentials.username &&
-    expectedCredentials.password === defaultCredentials.password;
-
   const isAdmin = role === 'admin';
   const title = isAdmin
     ? 'Masuk Panel Admin & Guru'
     : 'Masuk Ruang Pengawas / Proktor';
   const subtitle = isAdmin
-    ? 'Masukkan username dan password administrator sekolah untuk mengelola soal, sesi, dan pengaturan.'
+    ? 'Masukkan username dan password Administrator atau akun Guru yang terdaftar.'
     : 'Masukkan username dan password pengawas ruang yang telah diatur oleh administrator.';
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -55,15 +65,57 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
       return;
     }
 
-    if (
-      inputUser.toLowerCase() !== expectedCredentials.username.trim().toLowerCase() ||
-      inputPass !== expectedCredentials.password
-    ) {
-      setError('Username atau password tidak sesuai.');
+    if (isAdmin) {
+      if (
+        inputUser.toLowerCase() ===
+          expectedCredentials.username.trim().toLowerCase() &&
+        inputPass === expectedCredentials.password
+      ) {
+        onSuccess({ role: 'admin', displayName: 'Administrator Sekolah' });
+        return;
+      }
+
+      const matchedTeacher = teacherAccounts.find(
+        (t) =>
+          t.username.trim().toLowerCase() === inputUser.toLowerCase() &&
+          t.password === inputPass
+      );
+
+      if (matchedTeacher) {
+        if (!matchedTeacher.active) {
+          setError(
+            'Akun guru ini sedang dinonaktifkan. Hubungi Administrator sekolah.'
+          );
+          return;
+        }
+        onSuccess({
+          role: 'teacher',
+          displayName: matchedTeacher.name,
+          teacherId: matchedTeacher.id,
+          subjectSpecialty: matchedTeacher.subjectSpecialty,
+          allowedMenus:
+            matchedTeacher.allowedMenus &&
+            matchedTeacher.allowedMenus.length > 0
+              ? matchedTeacher.allowedMenus
+              : DEFAULT_TEACHER_ALLOWED_MENUS,
+        });
+        return;
+      }
+
+      setError('Username atau password Admin/Guru tidak sesuai.');
       return;
     }
 
-    onSuccess(role);
+    if (
+      inputUser.toLowerCase() !==
+        expectedCredentials.username.trim().toLowerCase() ||
+      inputPass !== expectedCredentials.password
+    ) {
+      setError('Username atau password pengawas tidak sesuai.');
+      return;
+    }
+
+    onSuccess({ role: 'proctor', displayName: 'Pengawas / Proktor' });
   };
 
   return (
@@ -73,14 +125,17 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
       aria-modal="true"
       aria-labelledby="role-login-title"
     >
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl">
+      <motion.div
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                isAdmin
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-blue-700 text-white'
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                isAdmin ? 'bg-slate-900 text-white' : 'bg-blue-700 text-white'
               }`}
             >
               {isAdmin ? (
@@ -106,7 +161,7 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Tutup dialog login"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -123,8 +178,8 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder={isAdmin ? 'Username admin' : 'Username pengawas'}
-              className="mt-1.5 w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/15"
+              placeholder={isAdmin ? 'Username admin / guru' : 'Username pengawas'}
+              className="mt-1.5 w-full min-h-[42px] rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/15"
             />
           </div>
 
@@ -139,7 +194,7 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan password"
-                className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white py-2 pl-3.5 pr-10 text-sm text-slate-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/15"
+                className="w-full min-h-[42px] rounded-xl border border-slate-300 bg-white py-2 pl-3.5 pr-10 text-sm text-slate-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/15"
               />
               <button
                 type="button"
@@ -159,28 +214,8 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800">
               {error}
-            </div>
-          )}
-
-          {isUsingDefault && (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-600">
-              <span>
-                Akun awal: <strong className="font-mono text-slate-900">{defaultCredentials.username}</strong> /{' '}
-                <strong className="font-mono text-slate-900">{defaultCredentials.password}</strong>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setUsername(defaultCredentials.username);
-                  setPassword(defaultCredentials.password);
-                  setError(null);
-                }}
-                className="font-semibold text-blue-700 hover:underline whitespace-nowrap shrink-0"
-              >
-                Isi Otomatis
-              </button>
             </div>
           )}
 
@@ -188,13 +223,13 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="min-h-[40px] rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
               Batal
             </button>
             <button
               type="submit"
-              className={`min-h-[40px] rounded-lg px-5 py-2 text-xs font-semibold text-white transition-colors ${
+              className={`min-h-[40px] rounded-xl px-5 py-2 text-xs font-semibold text-white transition-all active:scale-[0.98] ${
                 isAdmin
                   ? 'bg-slate-900 hover:bg-slate-800'
                   : 'bg-blue-700 hover:bg-blue-800'
@@ -204,7 +239,7 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };

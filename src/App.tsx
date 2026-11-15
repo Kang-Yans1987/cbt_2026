@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
+  AiEvaluationResult,
   DrivePdfFile,
   ExamPackageData,
   ExamSubmission,
@@ -14,7 +15,6 @@ import {
   DEFAULT_ADMIN_CREDENTIALS,
   DEFAULT_PROCTOR_CREDENTIALS,
   INITIAL_QUESTIONS,
-  INITIAL_STUDENTS,
   INITIAL_SUBMISSIONS,
 } from './data/defaultExamData';
 import {
@@ -41,7 +41,10 @@ import { StudentExamRunner } from './components/StudentExamRunner';
 import { StudentResultView } from './components/StudentResultView';
 import { AdminDashboard, type AdminSection } from './components/AdminDashboard';
 import { ProctorStandaloneView } from './components/ProctorStandaloneView';
-import { RoleLoginModal } from './components/RoleLoginModal';
+import {
+  RoleLoginModal,
+  type AuthenticatedActor,
+} from './components/RoleLoginModal';
 import { OfflineIndicator } from './components/PWAControls';
 
 type AppView = 'portal' | 'exam' | 'result' | 'admin' | 'proctor';
@@ -52,6 +55,8 @@ export default function App() {
   const [loginPromptRole, setLoginPromptRole] = useState<
     'admin' | 'proctor' | null
   >(null);
+  const [authenticatedActor, setAuthenticatedActor] =
+    useState<AuthenticatedActor | null>(null);
   const [adminInitialSection, setAdminInitialSection] =
     useState<AdminSection>('analytics');
   const [examPackage, setExamPackage] = useState<ExamPackageData>(() =>
@@ -96,28 +101,65 @@ export default function App() {
     async function bootstrap() {
       const localPkg = await loadEncryptedExamPackage(DEFAULT_SPREADSHEET_ID);
       if (localPkg && mounted) {
-        const hasIllustrated = localPkg.questions.some((q) =>
+        let updatedPkg = localPkg;
+        let changed = false;
+
+        // Clear untouched legacy dummy students once if still cached in IndexedDB
+        const legacyDummyStudents =
+          updatedPkg.students.length === 6 &&
+          updatedPkg.students.every(
+            (s) =>
+              /^STD-0[1-6]$/.test(s.id) &&
+              /^2026-01-00[1-6]$/.test(s.participantNumber)
+          );
+        if (legacyDummyStudents) {
+          updatedPkg = { ...updatedPkg, students: [] };
+          changed = true;
+        }
+
+        const hasIllustrated = updatedPkg.questions.some((q) =>
           Boolean(q.imageUrl)
         );
         if (!hasIllustrated) {
           const sampleImages = INITIAL_QUESTIONS.filter(
             (q) =>
               Boolean(q.imageUrl) &&
-              !localPkg.questions.some((existing) => existing.id === q.id)
+              !updatedPkg.questions.some((existing) => existing.id === q.id)
           );
           if (sampleImages.length > 0) {
-            const migratedPkg: ExamPackageData = {
-              ...localPkg,
-              questions: [...localPkg.questions, ...sampleImages],
+            updatedPkg = {
+              ...updatedPkg,
+              questions: [...updatedPkg.questions, ...sampleImages],
             };
-            await saveEncryptedExamPackage(migratedPkg);
-            setExamPackage(migratedPkg);
-          } else {
-            setExamPackage(localPkg);
+            changed = true;
           }
-        } else {
-          setExamPackage(localPkg);
         }
+
+        // Migrate legacy default AksaraCBT branding & default school name
+        if (!updatedPkg.appTitle || updatedPkg.appTitle === 'AksaraCBT') {
+          updatedPkg = { ...updatedPkg, appTitle: 'DutawangiCBT' };
+          changed = true;
+        }
+        if (
+          !updatedPkg.schoolName ||
+          updatedPkg.schoolName === 'SMA Negeri 1 Nusantara'
+        ) {
+          updatedPkg = {
+            ...updatedPkg,
+            schoolName: 'SD Negeri 2 Tukangkayu',
+            subjects: updatedPkg.subjects.map((s) =>
+              s.schoolName === 'SMA Negeri 1 Nusantara'
+                ? { ...s, schoolName: 'SD Negeri 2 Tukangkayu' }
+                : s
+            ),
+          };
+          changed = true;
+        }
+
+        if (changed) {
+          await saveEncryptedExamPackage(updatedPkg);
+        }
+        setExamPackage(updatedPkg);
         setHasEncryptedCache(true);
       } else {
         const initial = createInitialPackage();
@@ -125,7 +167,9 @@ export default function App() {
         if (mounted) setHasEncryptedCache(true);
       }
 
-      const localSubs = await getAllLocalSubmissions();
+      const localSubs = (await getAllLocalSubmissions()).filter(
+        (s) => s.id !== 'SUB-DEMO-01' && s.id !== 'SUB-DEMO-02'
+      );
       if (localSubs.length > 0 && mounted) {
         setSubmissions((prev) => {
           const map = new Map<string, ExamSubmission>();
@@ -319,8 +363,14 @@ export default function App() {
 
     const nextPkg: ExamPackageData = {
       ...examPackage,
-      appTitle: pulled.appTitle || examPackage.appTitle || 'AksaraCBT',
-      schoolName: pulled.schoolName || examPackage.schoolName,
+      appTitle:
+        !pulled.appTitle || pulled.appTitle === 'AksaraCBT'
+          ? 'DutawangiCBT'
+          : pulled.appTitle,
+      schoolName:
+        pulled.schoolName === 'SMA Negeri 1 Nusantara'
+          ? 'SD Negeri 2 Tukangkayu'
+          : pulled.schoolName || examPackage.schoolName,
       schoolLogoUrl:
         pulled.schoolLogoUrl !== undefined
           ? pulled.schoolLogoUrl
@@ -333,6 +383,10 @@ export default function App() {
         pulled.adminCredentials || examPackage.adminCredentials,
       proctorCredentials:
         pulled.proctorCredentials || examPackage.proctorCredentials,
+      examTimeSettings:
+        pulled.examTimeSettings || examPackage.examTimeSettings,
+      teachers:
+        pulled.teachers.length > 0 ? pulled.teachers : examPackage.teachers,
       subjects:
         pulled.subjects.length > 0 ? pulled.subjects : examPackage.subjects,
       questions:
@@ -343,6 +397,22 @@ export default function App() {
         pulled.examSessions && pulled.examSessions.length > 0
           ? pulled.examSessions
           : examPackage.examSessions,
+      examRooms:
+        pulled.examRooms && pulled.examRooms.length > 0
+          ? pulled.examRooms
+          : examPackage.examRooms,
+      proctorMappings:
+        pulled.proctorMappings && pulled.proctorMappings.length > 0
+          ? pulled.proctorMappings
+          : examPackage.proctorMappings,
+      examSchedules:
+        pulled.examSchedules && pulled.examSchedules.length > 0
+          ? pulled.examSchedules
+          : examPackage.examSchedules,
+      beritaAcaraList:
+        pulled.beritaAcaraList && pulled.beritaAcaraList.length > 0
+          ? pulled.beritaAcaraList
+          : examPackage.beritaAcaraList,
       updatedAt: new Date().toISOString(),
     };
     await updateExamPackage(nextPkg);
@@ -376,38 +446,121 @@ export default function App() {
   };
 
   const handleCompleteExam = async (sub: ExamSubmission) => {
-    let savedSub = sub;
-    if (isOnline) {
+    const initialSub: ExamSubmission = {
+      ...sub,
+      syncStatus: isOnline ? 'synced_server' : 'pending_offline',
+    };
+
+    // Save locally and show result screen immediately without waiting on network I/O
+    await saveSubmissionOffline(initialSub);
+    setSubmissions((prev) => [
+      initialSub,
+      ...prev.filter((s) => s.id !== initialSub.id),
+    ]);
+    setLatestSubmission(initialSub);
+    setView('result');
+
+    if (!isOnline) return;
+
+    // Background sync: optionally upgrade deferred AI essay grading, submit to server, and append to Sheets
+    (async () => {
+      let finalSub = initialSub;
       try {
+        const subjectCfg = examPackage.subjects.find(
+          (s) => s.id === finalSub.subjectId
+        );
+        const essayQuestions = examPackage.questions.filter(
+          (q) => q.subjectId === finalSub.subjectId && q.type === 'ISIAN'
+        );
+        const hasDeferredLocalAi =
+          essayQuestions.length > 0 &&
+          finalSub.aiEvaluations.some((ev) => ev.gradedBy === 'LOCAL_OFFLINE');
+
+        if (hasDeferredLocalAi) {
+          try {
+            const aiRes = await fetch('/api/ai/grade-batch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                items: essayQuestions.map((q) => ({
+                  questionId: q.id,
+                  questionPrompt: q.prompt,
+                  referenceAnswer: q.correctAnswer,
+                  keywords: q.aiKeywords || q.correctAnswer,
+                  maxScore: q.weight,
+                  studentAnswer: finalSub.answers[q.id] || '',
+                })),
+              }),
+            });
+            if (aiRes.ok) {
+              const data = (await aiRes.json()) as {
+                results: AiEvaluationResult[];
+              };
+              if (Array.isArray(data.results) && data.results.length > 0) {
+                const aiEssayScore = Number(
+                  data.results
+                    .reduce((sum, ev) => sum + ev.score, 0)
+                    .toFixed(2)
+                );
+                const totalScore = Number(
+                  (finalSub.objectiveScore + aiEssayScore).toFixed(2)
+                );
+                const percentage =
+                  finalSub.maxPossibleScore > 0
+                    ? Math.round((totalScore / finalSub.maxPossibleScore) * 100)
+                    : 0;
+                const kkm = subjectCfg?.passingGradeKkm ?? 75;
+                finalSub = {
+                  ...finalSub,
+                  aiEvaluations: data.results,
+                  aiEssayScore,
+                  totalScore,
+                  percentage,
+                  passedKkm: percentage >= kkm,
+                };
+              }
+            }
+          } catch {
+            // Keep offline local essay score if AI call fails
+          }
+        }
+
         const res = await fetch('/api/exam/submit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sub),
+          body: JSON.stringify(finalSub),
         });
-        if (res.ok && accessToken) {
-          try {
-            await appendSubmissionToSheet(
-              examPackage.spreadsheetId,
-              accessToken,
-              sub
-            );
-            savedSub = { ...sub, syncStatus: 'synced_sheets' };
-          } catch {
-            savedSub = { ...sub, syncStatus: 'synced_server' };
+
+        if (res.ok) {
+          let nextStatus: ExamSubmission['syncStatus'] = 'synced_server';
+          if (accessToken) {
+            try {
+              await appendSubmissionToSheet(
+                examPackage.spreadsheetId,
+                accessToken,
+                finalSub
+              );
+              nextStatus = 'synced_sheets';
+            } catch {
+              // Keep synced_server
+            }
           }
+          finalSub = { ...finalSub, syncStatus: nextStatus };
+        } else {
+          finalSub = { ...finalSub, syncStatus: 'pending_offline' };
         }
       } catch {
-        savedSub = { ...sub, syncStatus: 'pending_offline' };
+        finalSub = { ...finalSub, syncStatus: 'pending_offline' };
       }
-    }
 
-    await saveSubmissionOffline(savedSub);
-    setSubmissions((prev) => [
-      savedSub,
-      ...prev.filter((s) => s.id !== savedSub.id),
-    ]);
-    setLatestSubmission(savedSub);
-    setView('result');
+      await saveSubmissionOffline(finalSub);
+      setSubmissions((prev) =>
+        prev.map((item) => (item.id === finalSub.id ? finalSub : item))
+      );
+      setLatestSubmission((prev) =>
+        prev?.id === finalSub.id ? finalSub : prev
+      );
+    })();
   };
 
   const handleBroadcastExamEnd = async (subjectId: string, message: string) => {
@@ -498,7 +651,7 @@ export default function App() {
   const handleResetStudentsToDefault = async () => {
     await updateExamPackage({
       ...examPackage,
-      students: INITIAL_STUDENTS,
+      students: [],
       updatedAt: new Date().toISOString(),
     });
   };
@@ -538,11 +691,11 @@ export default function App() {
     [submissions]
   );
 
-  const appTitle = examPackage.appTitle || 'AksaraCBT';
+  const appTitle = examPackage.appTitle || 'DutawangiCBT';
   const schoolName =
     examPackage.schoolName ||
     examPackage.subjects[0]?.schoolName ||
-    'SMA Negeri 1 Nusantara';
+    'SD Negeri 2 Tukangkayu';
   const schoolLogoUrl = examPackage.schoolLogoUrl || '';
 
   return (
@@ -575,6 +728,9 @@ export default function App() {
           )}
           isOnline={isOnline}
           hasEncryptedCache={hasEncryptedCache}
+          examTimeSettings={examPackage.examTimeSettings}
+          examSessions={examPackage.examSessions}
+          examSchedules={examPackage.examSchedules}
           onStartExam={(student, subject) => {
             setActiveStudent(student);
             setActiveSubject(subject);
@@ -593,6 +749,7 @@ export default function App() {
             (q) => q.subjectId === activeSubject.id
           )}
           accessToken={accessToken}
+          examTimeSettings={examPackage.examTimeSettings}
           onComplete={handleCompleteExam}
           onExit={() => {
             setActiveStudent(null);
@@ -607,6 +764,9 @@ export default function App() {
           schoolName={schoolName}
           schoolLogoUrl={schoolLogoUrl}
           submission={latestSubmission}
+          showScoreImmediately={
+            examPackage.examTimeSettings?.showScoreImmediately !== false
+          }
           onReturnHome={() => {
             setLatestSubmission(null);
             setActiveStudent(null);
@@ -621,7 +781,10 @@ export default function App() {
           examPackage={examPackage}
           submissions={submissions}
           proctorSessions={proctorSessions}
-          onBackToPortal={() => setView('portal')}
+          onBackToPortal={() => {
+            setAuthenticatedActor(null);
+            setView('portal');
+          }}
           onBroadcastAnnouncement={handleBroadcastAnnouncement}
           onSendProctorAction={handleSendProctorAction}
         />
@@ -641,9 +804,13 @@ export default function App() {
             cachedPdfCount,
             drivePdfs.filter((f) => f.cachedOffline).length
           )}
+          authenticatedActor={authenticatedActor}
           onSignIn={handleSignIn}
           onSignOut={handleSignOut}
-          onBackToPortal={() => setView('portal')}
+          onBackToPortal={() => {
+            setAuthenticatedActor(null);
+            setView('portal');
+          }}
           onUpdatePackage={updateExamPackage}
           onUpdateSubmissions={setSubmissions}
           onUpdateDrivePdfs={(files) => {
@@ -670,15 +837,15 @@ export default function App() {
             ? examPackage.adminCredentials || DEFAULT_ADMIN_CREDENTIALS
             : examPackage.proctorCredentials || DEFAULT_PROCTOR_CREDENTIALS
         }
-        defaultCredentials={
-          loginPromptRole === 'admin'
-            ? DEFAULT_ADMIN_CREDENTIALS
-            : DEFAULT_PROCTOR_CREDENTIALS
-        }
-        onSuccess={(role) => {
+        teacherAccounts={examPackage.teachers || []}
+        onSuccess={(actor) => {
           setLoginPromptRole(null);
-          if (role === 'admin') {
+          setAuthenticatedActor(actor);
+          if (actor.role === 'admin') {
             setAdminInitialSection('analytics');
+            setView('admin');
+          } else if (actor.role === 'teacher') {
+            setAdminInitialSection(actor.allowedMenus?.[0] || 'analytics');
             setView('admin');
           } else {
             setView('proctor');

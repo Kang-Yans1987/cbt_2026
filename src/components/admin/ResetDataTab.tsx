@@ -65,7 +65,7 @@ export const ResetDataTab: React.FC<ResetDataTabProps> = ({
       } else if (action === 'students') {
         await onResetStudentsToDefault();
         setStatusMsg(
-          'Daftar peserta dikembalikan ke data awal bawaan aplikasi.'
+          'Seluruh daftar peserta berhasil dikosongkan. Silakan tambah atau impor akun peserta baru.'
         );
       } else if (action === 'factory') {
         await onFactoryReset();
@@ -97,9 +97,9 @@ export const ResetDataTab: React.FC<ResetDataTabProps> = ({
       label: 'Ya, Reset Sesi Aktif',
     },
     students: {
-      title: 'Kembalikan Daftar Peserta ke Awal?',
-      description: `Daftar ${studentCount} peserta saat ini akan diganti kembali dengan daftar peserta simulasi awal. Pastikan Anda sudah mencadangkan data jika diperlukan.`,
-      label: 'Ya, Reset Daftar Peserta',
+      title: 'Kosongkan Semua Daftar Peserta?',
+      description: `Seluruh ${studentCount} akun peserta saat ini akan dihapus agar Anda dapat membuat atau mengimpor daftar peserta baru. Pastikan Anda sudah mencadangkan data jika diperlukan.`,
+      label: 'Ya, Kosongkan Peserta',
     },
     factory: {
       title: 'Reset Total ke Pengaturan Awal Aplikasi?',
@@ -220,11 +220,11 @@ export const ResetDataTab: React.FC<ResetDataTabProps> = ({
                 <Users className="h-4 w-4" />
               </div>
               <h3 className="text-base font-semibold text-slate-900">
-                Reset Daftar Peserta ke Bawaan
+                Kosongkan Daftar Peserta
               </h3>
             </div>
             <p className="text-xs leading-relaxed text-slate-600">
-              Mengembalikan daftar peserta ke 6 data peserta bawaan aplikasi. Berguna apabila Anda ingin mengulang proses import kolektif peserta.
+              Menghapus seluruh daftar akun peserta saat ini agar Anda dapat mengulang proses tambah manual atau import kolektif peserta resmi.
             </p>
           </div>
           <button
@@ -233,7 +233,7 @@ export const ResetDataTab: React.FC<ResetDataTabProps> = ({
             onClick={() => setConfirmType('students')}
             className="min-h-[40px] w-full sm:w-auto self-start rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
           >
-            Reset Daftar Peserta ({studentCount})
+            Kosongkan Peserta ({studentCount})
           </button>
         </div>
 

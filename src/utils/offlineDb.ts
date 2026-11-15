@@ -38,8 +38,11 @@ export interface ActiveAttemptState {
   updatedAt: string;
 }
 
+let cachedDbPromise: Promise<IDBDatabase> | null = null;
+
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (cachedDbPromise) return cachedDbPromise;
+  cachedDbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -56,9 +59,20 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(STORES.SUBMISSIONS, { keyPath: 'id' });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => {
+        db.close();
+        cachedDbPromise = null;
+      };
+      resolve(db);
+    };
+    request.onerror = () => {
+      cachedDbPromise = null;
+      reject(request.error);
+    };
   });
+  return cachedDbPromise;
 }
 
 async function idbPut<T>(storeName: string, value: T): Promise<void> {

@@ -35,11 +35,11 @@ export const ProctorStandaloneView: React.FC<ProctorStandaloneViewProps> = ({
 }) => {
   const [globalError, setGlobalError] = useState<string | null>(null);
 
-  const appTitle = examPackage.appTitle || 'AksaraCBT';
+  const appTitle = examPackage.appTitle || 'DutawangiCBT';
   const schoolName =
     examPackage.schoolName ||
     examPackage.subjects[0]?.schoolName ||
-    'SMA Negeri 1 Nusantara';
+    'SD Negeri 2 Tukangkayu';
   const schoolLogoUrl = examPackage.schoolLogoUrl || '';
   const examSessions =
     examPackage.examSessions && examPackage.examSessions.length > 0

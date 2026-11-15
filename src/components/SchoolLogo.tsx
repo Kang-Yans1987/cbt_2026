@@ -8,7 +8,7 @@ interface SchoolLogoProps {
 
 export const SchoolLogo: React.FC<SchoolLogoProps> = ({
   logoUrl,
-  schoolName = 'AksaraCBT',
+  schoolName = 'DutawangiCBT',
   size = 'md',
 }) => {
   const [imgFailed, setImgFailed] = useState(false);

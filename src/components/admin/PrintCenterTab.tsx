@@ -1,7 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { Download, Eye, Printer, X } from 'lucide-react';
-import type { ExamSubmission, Student, SubjectConfig } from '../../types/exam';
+import type {
+  ExamRoom,
+  ExamScheduleItem,
+  ExamSubmission,
+  ExamTimeSettings,
+  ProctorMappingEntry,
+  Student,
+  SubjectConfig,
+} from '../../types/exam';
 import { SchoolLogo } from '../SchoolLogo';
+
+type PrintCenterMode = 'cards' | 'recap' | 'schedule' | 'proctor_map' | 'rooms';
 
 interface PrintCenterTabProps {
   schoolName: string;
@@ -9,6 +19,10 @@ interface PrintCenterTabProps {
   subjects: SubjectConfig[];
   students: Student[];
   submissions: ExamSubmission[];
+  examRooms?: ExamRoom[];
+  proctorMappings?: ProctorMappingEntry[];
+  examSchedules?: ExamScheduleItem[];
+  examTimeSettings?: ExamTimeSettings;
 }
 
 export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
@@ -17,8 +31,12 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
   subjects,
   students,
   submissions,
+  examRooms = [],
+  proctorMappings = [],
+  examSchedules = [],
+  examTimeSettings,
 }) => {
-  const [mode, setMode] = useState<'cards' | 'recap'>('cards');
+  const [mode, setMode] = useState<PrintCenterMode>('cards');
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(
     subjects[0]?.id || ''
@@ -33,7 +51,7 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
     'Dr. H. Rahmat Hidayat, M.Pd'
   );
   const [proctorTeacherName, setProctorTeacherName] = useState(
-    'Pengawas / Guru Mapel'
+    'Pengawas / Panitia Ujian'
   );
   const [cityDate, setCityDate] = useState(
     `Indonesia, ${new Date().toLocaleDateString('id-ID', {
@@ -42,6 +60,8 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
       year: 'numeric',
     })}`
   );
+
+  const tzLabel = examTimeSettings?.timezone || 'WIB';
 
   const effectiveSubjectId = subjects.some((s) => s.id === selectedSubjectId)
     ? selectedSubjectId
@@ -143,74 +163,115 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
       {filteredStudents.map((st) => (
         <div
           key={st.id}
-          className="print-break-inside-avoid rounded-xl border border-slate-300 bg-white p-5"
+          className="print-break-inside-avoid rounded-xl border border-slate-300 bg-white p-4 sm:p-5"
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <SchoolLogo
                 logoUrl={schoolLogoUrl}
                 schoolName={schoolName}
                 size="md"
               />
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Kartu Peserta Ujian
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Kartu Nomor Peserta Ujian
                 </p>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-slate-900 truncate">
                   {schoolName || selectedSubject?.schoolName || 'Sekolah'}
                 </h3>
               </div>
             </div>
-            <span className="font-mono text-xs font-bold text-blue-700">
+            <span className="font-mono text-xs font-bold text-blue-700 shrink-0">
               {selectedSubject?.code || 'CBT'}
             </span>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
-            <div className="col-span-2 space-y-1.5">
-              <div>
-                <span className="text-slate-500">Nomor Peserta: </span>
-                <span className="font-mono font-bold text-slate-900">
-                  {st.participantNumber}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-500">Nama: </span>
-                <span className="font-semibold text-slate-900">{st.name}</span>
-              </div>
-              <div>
-                <span className="text-slate-500">Kelas: </span>
-                <span className="text-slate-900">{st.className}</span>
-              </div>
-              <div>
-                <span className="text-slate-500">Ruang / Sesi: </span>
-                <span className="text-slate-900">
-                  {st.room} · {st.session}
-                </span>
-              </div>
+          <div className="mt-3.5 flex items-stretch gap-3.5 text-xs">
+            {/* Pas Foto 3x4 Slot */}
+            <div className="w-[72px] h-[96px] shrink-0 rounded-lg border border-slate-300 bg-slate-50 overflow-hidden flex flex-col items-center justify-center text-center">
+              {st.photoUrl ? (
+                <img
+                  src={st.photoUrl}
+                  alt={`Foto ${st.name}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="px-1.5 text-[10px] font-medium text-slate-400 leading-tight">
+                  Pas Foto
+                  <br />
+                  3 × 4
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-col items-end justify-between rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-right">
-              <div>
-                <p className="text-[10px] text-slate-500">PIN Akses</p>
-                <p className="font-mono text-sm font-bold text-slate-900">
-                  {st.accessPin}
-                </p>
+            {/* Detail Peserta */}
+            <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
+              <div className="space-y-1">
+                <div>
+                  <span className="text-slate-500">No. Peserta: </span>
+                  <span className="font-mono font-bold text-slate-900">
+                    {st.participantNumber}
+                  </span>
+                </div>
+                <div className="truncate">
+                  <span className="text-slate-500">Nama: </span>
+                  <span className="font-semibold text-slate-900">{st.name}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Kelas: </span>
+                  <span className="text-slate-900">{st.className}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Ruang / Sesi: </span>
+                  <span className="text-slate-900">
+                    {st.room} · {st.session}
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] text-slate-500">Token</p>
-                <p className="font-mono text-xs font-bold text-blue-700">
-                  {selectedSubject?.token || '-'}
-                </p>
+
+              <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+                <span className="text-[11px] font-medium text-slate-500">
+                  PIN Akses
+                </span>
+                <span className="font-mono text-sm font-bold text-slate-900">
+                  {st.accessPin}
+                </span>
               </div>
             </div>
           </div>
         </div>
       ))}
+      {filteredStudents.length === 0 && (
+        <div className="sm:col-span-2 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          Belum ada data peserta pada filter ini untuk dicetak sebagai kartu peserta.
+        </div>
+      )}
     </div>
   );
 
-  const renderRecapSheet = (includeSignatures: boolean) => (
+  const renderSignatures = () =>
+    showSignatureBlock ? (
+      <div className="print-break-inside-avoid mt-10 grid grid-cols-2 gap-8 pt-6 text-xs text-slate-700">
+        <div>
+          <p>Mengetahui,</p>
+          <p className="font-semibold text-slate-900">Kepala {schoolName}</p>
+          <div className="h-16" />
+          <p className="font-semibold underline text-slate-900">
+            {principalName}
+          </p>
+        </div>
+        <div className="text-right">
+          <p>{cityDate}</p>
+          <p className="font-semibold text-slate-900">{proctorTeacherName}</p>
+          <div className="h-16" />
+          <p className="font-semibold underline text-slate-900">
+            ............................................
+          </p>
+        </div>
+      </div>
+    ) : null;
+
+  const renderRecapSheet = () => (
     <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
       <div className="border-b-2 border-slate-800 pb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3.5">
@@ -224,7 +285,7 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
               {schoolName || selectedSubject?.schoolName || 'Sekolah'}
             </p>
             <h3 className="text-base sm:text-lg font-bold text-slate-900">
-              Berita Acara & Rekapitulasi Nilai Ujian —{' '}
+              Rekapitulasi Nilai Ujian —{' '}
               {selectedClass === 'ALL'
                 ? 'Semua Kelas'
                 : `Kelas ${selectedClass}`}
@@ -351,30 +412,206 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
         </table>
       </div>
 
-      {includeSignatures && showSignatureBlock && (
-        <div className="print-break-inside-avoid mt-10 grid grid-cols-2 gap-8 pt-6 text-xs text-slate-700">
+      {renderSignatures()}
+    </div>
+  );
+
+  const renderScheduleSheet = () => (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-8 space-y-5">
+      <div className="border-b-2 border-slate-800 pb-4 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <SchoolLogo logoUrl={schoolLogoUrl} schoolName={schoolName} size="lg" />
           <div>
-            <p>Mengetahui,</p>
-            <p className="font-semibold text-slate-900">Kepala Sekolah</p>
-            <div className="h-16" />
-            <p className="font-semibold underline text-slate-900">
-              {principalName}
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-600">
+              {schoolName}
             </p>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+              Jadwal Pelaksanaan Ujian Berbasis Komputer
+            </h3>
+            <p className="text-xs text-slate-600">Zona Waktu: {tzLabel}</p>
           </div>
-          <div className="text-right">
-            <p>{cityDate}</p>
-            <p className="font-semibold text-slate-900">
-              Pengawas / Guru Mata Pelajaran
+        </div>
+        <p className="text-xs text-slate-600">
+          Tanggal Cetak: {new Date().toLocaleDateString('id-ID')}
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
+          <thead className="border-b border-slate-300 bg-slate-50 font-semibold text-slate-700">
+            <tr>
+              <th className="py-2.5 px-3">No</th>
+              <th className="py-2.5 px-3">Hari &amp; Tanggal</th>
+              <th className="py-2.5 px-3">Waktu ({tzLabel})</th>
+              <th className="py-2.5 px-3">Mata Pelajaran</th>
+              <th className="py-2.5 px-3">Sesi &amp; Kelas</th>
+              <th className="py-2.5 px-3">Ruang</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {examSchedules.map((item, idx) => (
+              <tr key={item.id}>
+                <td className="py-2.5 px-3 font-mono text-slate-500">{idx + 1}</td>
+                <td className="py-2.5 px-3">
+                  <p className="font-semibold text-slate-900">{item.dayLabel}</p>
+                  <p className="font-mono text-xs text-slate-500">{item.date}</p>
+                </td>
+                <td className="py-2.5 px-3 font-mono font-semibold text-blue-700">
+                  {item.startTime} – {item.endTime}
+                </td>
+                <td className="py-2.5 px-3 font-semibold text-slate-900">
+                  {item.subjectName}
+                </td>
+                <td className="py-2.5 px-3">
+                  {item.sessionName} · {item.targetClass}
+                </td>
+                <td className="py-2.5 px-3">{item.roomSummary}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {renderSignatures()}
+    </div>
+  );
+
+  const renderProctorMappingSheet = () => (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-8 space-y-5">
+      <div className="border-b-2 border-slate-800 pb-4 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <SchoolLogo logoUrl={schoolLogoUrl} schoolName={schoolName} size="lg" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-600">
+              {schoolName}
             </p>
-            <div className="h-16" />
-            <p className="font-semibold underline text-slate-900">
-              {proctorTeacherName}
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+              Pemetaan Pengawas Ruang Ujian Berbasis Komputer
+            </h3>
+            <p className="text-xs text-slate-600">
+              Total Tugas Pengawas: {proctorMappings.length}
             </p>
           </div>
         </div>
-      )}
+        <p className="text-xs text-slate-600">
+          Tanggal Cetak: {new Date().toLocaleDateString('id-ID')}
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-left text-xs sm:text-sm">
+          <thead className="border-b border-slate-300 bg-slate-50 font-semibold text-slate-700">
+            <tr>
+              <th className="py-2.5 px-3">No</th>
+              <th className="py-2.5 px-3">Tanggal</th>
+              <th className="py-2.5 px-3">Ruang &amp; Sesi</th>
+              <th className="py-2.5 px-3">Mata Pelajaran</th>
+              <th className="py-2.5 px-3">Nama Pengawas</th>
+              <th className="py-2.5 px-3">NIP</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {proctorMappings.map((item, idx) => (
+              <tr key={item.id}>
+                <td className="py-2.5 px-3 font-mono text-slate-500">{idx + 1}</td>
+                <td className="py-2.5 px-3 font-mono text-xs">{item.date}</td>
+                <td className="py-2.5 px-3">
+                  <span className="font-semibold text-slate-900">
+                    {item.roomName}
+                  </span>{' '}
+                  · {item.sessionName}
+                </td>
+                <td className="py-2.5 px-3">{item.subjectName}</td>
+                <td className="py-2.5 px-3 font-semibold text-slate-900">
+                  {item.proctorName}
+                </td>
+                <td className="py-2.5 px-3 font-mono text-xs">
+                  {item.proctorNip || '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {renderSignatures()}
     </div>
   );
+
+  const renderRoomsSheet = () => (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-8 space-y-5">
+      <div className="border-b-2 border-slate-800 pb-4 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <SchoolLogo logoUrl={schoolLogoUrl} schoolName={schoolName} size="lg" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-600">
+              {schoolName}
+            </p>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+              Daftar Pengaturan Ruang &amp; Kapasitas Peserta
+            </h3>
+          </div>
+        </div>
+        <p className="text-xs text-slate-600">
+          Tanggal Cetak: {new Date().toLocaleDateString('id-ID')}
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-left text-xs sm:text-sm">
+          <thead className="border-b border-slate-300 bg-slate-50 font-semibold text-slate-700">
+            <tr>
+              <th className="py-2.5 px-3">No</th>
+              <th className="py-2.5 px-3">Kode</th>
+              <th className="py-2.5 px-3">Nama Ruang</th>
+              <th className="py-2.5 px-3">Lokasi</th>
+              <th className="py-2.5 px-3 text-right">Kapasitas</th>
+              <th className="py-2.5 px-3">Keterangan</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {examRooms.map((r, idx) => (
+              <tr key={r.id}>
+                <td className="py-2.5 px-3 font-mono text-slate-500">{idx + 1}</td>
+                <td className="py-2.5 px-3 font-mono font-semibold text-blue-700">
+                  {r.code}
+                </td>
+                <td className="py-2.5 px-3 font-semibold text-slate-900">
+                  {r.name}
+                </td>
+                <td className="py-2.5 px-3">{r.location}</td>
+                <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                  {r.capacity}
+                </td>
+                <td className="py-2.5 px-3 text-xs text-slate-600">
+                  {r.notes || '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {renderSignatures()}
+    </div>
+  );
+
+  const renderActiveSheet = () => {
+    switch (mode) {
+      case 'cards':
+        return renderCardsContent();
+      case 'recap':
+        return renderRecapSheet();
+      case 'schedule':
+        return renderScheduleSheet();
+      case 'proctor_map':
+        return renderProctorMappingSheet();
+      case 'rooms':
+        return renderRoomsSheet();
+    }
+  };
+
+  const modeTitleMap: Record<PrintCenterMode, string> = {
+    cards: 'Kartu Nomor Peserta',
+    recap: 'Rekap Nilai Kelas',
+    schedule: 'Jadwal Pelaksanaan',
+    proctor_map: 'Pemetaan Pengawas',
+    rooms: 'Daftar Ruang',
+  };
 
   return (
     <div className="space-y-6">
@@ -382,65 +619,75 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-              Pusat Cetak: Kartu Nomor Peserta & Rekap Nilai Kelas
+              Pusat Cetak A4: Kartu Peserta, Jadwal, Pengawas, Ruang &amp; Nilai
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Pratinjau tata letak kertas A4 sebelum mencetak kartu peserta resmi atau laporan rekap nilai kelas.
+              Pratinjau tata letak kertas A4 sebelum mencetak kartu peserta berfoto 3×4, jadwal, pemetaan pengawas, atau rekap nilai.
             </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-1 self-start rounded-lg bg-slate-100 p-1">
+        <div className="flex flex-wrap items-center gap-1 self-start rounded-lg bg-slate-100 p-1">
+          {(
+            [
+              { id: 'cards', label: 'Kartu Nomor Peserta' },
+              { id: 'recap', label: 'Rekap Nilai Kelas' },
+              { id: 'schedule', label: 'Jadwal Pelaksanaan' },
+              { id: 'proctor_map', label: 'Pemetaan Pengawas' },
+              { id: 'rooms', label: 'Daftar Ruang' },
+            ] as const
+          ).map((tab) => (
             <button
+              key={tab.id}
               type="button"
-              onClick={() => setMode('cards')}
+              onClick={() => setMode(tab.id)}
               className={`min-h-[36px] rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                mode === 'cards'
+                mode === tab.id
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Cetak Nomor Peserta
+              {tab.label}
             </button>
-            <button
-              type="button"
-              onClick={() => setMode('recap')}
-              className={`min-h-[36px] rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                mode === 'recap'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Cetak Rekap Nilai Kelas
-            </button>
-          </div>
+          ))}
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900"
-            >
-              <option value="ALL">Semua Kelas</option>
-              {classes.map((c) => (
-                <option key={c} value={c}>
-                  Kelas {c}
-                </option>
-              ))}
-            </select>
+            {(mode === 'cards' || mode === 'recap') && (
+              <>
+                <select
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900"
+                >
+                  <option value="ALL">Semua Kelas</option>
+                  {classes.map((c) => (
+                    <option key={c} value={c}>
+                      Kelas {c}
+                    </option>
+                  ))}
+                </select>
 
-            <select
-              value={effectiveSubjectId}
-              onChange={(e) => setSelectedSubjectId(e.target.value)}
-              className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900"
-            >
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+                <select
+                  value={effectiveSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
+                  className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900"
+                >
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            {mode !== 'cards' && mode !== 'recap' && (
+              <p className="text-xs text-slate-600">
+                Dokumen aktif siap cetak kertas A4:{' '}
+                <strong className="text-slate-900">{modeTitleMap[mode]}</strong>
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
@@ -468,7 +715,7 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
               className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800 whitespace-nowrap shrink-0"
             >
               <Printer className="h-3.5 w-3.5" />
-              {mode === 'cards' ? 'Cetak Kartu Peserta' : 'Cetak Rekap Nilai'}
+              Cetak {modeTitleMap[mode]}
             </button>
           </div>
         </div>
@@ -476,22 +723,20 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
 
       {/* Inline Printable Output Area (hidden from print when Preview modal is active so pages don't double!) */}
       <div className={previewOpen ? 'no-print' : 'print-page'}>
-        {mode === 'cards' ? renderCardsContent() : renderRecapSheet(true)}
+        {renderActiveSheet()}
       </div>
 
       {/* Dedicated A4 Print Preview Modal */}
       {previewOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/75 overflow-y-auto">
-          {/* Preview Controls Bar (never printed) */}
           <div className="no-print sticky top-0 z-10 border-b border-slate-700 bg-slate-900 px-4 sm:px-6 py-3 text-white">
             <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold">
-                  Pratinjau Cetak Kertas A4 —{' '}
-                  {mode === 'cards' ? 'Kartu Nomor Peserta' : 'Rekap Nilai Kelas'}
+                  Pratinjau Cetak Kertas A4 — {modeTitleMap[mode]}
                 </p>
                 <p className="text-xs text-slate-300">
-                  Periksa kelengkapan kop sekolah, kolom nilai, dan tanda tangan sebelum mencetak atau menyimpan sebagai PDF.
+                  Periksa kelengkapan kop sekolah, foto/kolom, dan tanda tangan sebelum mencetak atau menyimpan sebagai PDF.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5">
@@ -514,24 +759,28 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
               </div>
             </div>
 
-            {mode === 'recap' && (
+            {mode !== 'cards' && (
               <div className="mx-auto mt-3 flex max-w-5xl flex-wrap items-center gap-4 border-t border-slate-800 pt-3 text-xs text-slate-200">
-                <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showScoreBreakdown}
-                    onChange={(e) => setShowScoreBreakdown(e.target.checked)}
-                  />
-                  <span>Tampilkan Rincian PG & AI</span>
-                </label>
-                <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showViolationsCol}
-                    onChange={(e) => setShowViolationsCol(e.target.checked)}
-                  />
-                  <span>Tampilkan Kolom Pelanggaran</span>
-                </label>
+                {mode === 'recap' && (
+                  <>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showScoreBreakdown}
+                        onChange={(e) => setShowScoreBreakdown(e.target.checked)}
+                      />
+                      <span>Tampilkan Rincian PG & AI</span>
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showViolationsCol}
+                        onChange={(e) => setShowViolationsCol(e.target.checked)}
+                      />
+                      <span>Tampilkan Kolom Pelanggaran</span>
+                    </label>
+                  </>
+                )}
                 <label className="inline-flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
@@ -553,7 +802,7 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
                       type="text"
                       value={proctorTeacherName}
                       onChange={(e) => setProctorTeacherName(e.target.value)}
-                      placeholder="Nama Pengawas/Guru"
+                      placeholder="Jabatan Pihak Kanan"
                       className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-white"
                     />
                     <input
@@ -572,7 +821,7 @@ export const PrintCenterTab: React.FC<PrintCenterTabProps> = ({
           {/* Simulated A4 Paper Container */}
           <div className="mx-auto my-6 w-full max-w-[900px] px-3 sm:px-6 print:m-0 print:max-w-none print:p-0">
             <div className="print-page rounded-xl bg-white shadow-2xl p-2 sm:p-4 print:shadow-none print:p-0">
-              {mode === 'cards' ? renderCardsContent() : renderRecapSheet(true)}
+              {renderActiveSheet()}
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
@@ -24,6 +24,11 @@ import type {
   SubjectConfig,
 } from '../../types/exam';
 import { ConfirmDialog } from '../ConfirmDialog';
+import {
+  formatTokenCountdown,
+  getActiveSubjectToken,
+  getTokenSecondsRemaining,
+} from '../../utils/tokenGenerator';
 
 interface ProctorControlTabProps {
   subjects: SubjectConfig[];
@@ -75,6 +80,21 @@ export const ProctorControlTab: React.FC<ProctorControlTabProps> = ({
     : subjects[0]?.id || '';
 
   const activeSubject = subjects.find((s) => s.id === effectiveSubjectId);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (activeSubject?.tokenMode !== 'auto_15m') return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [activeSubject?.tokenMode]);
+
+  const activeToken = activeSubject
+    ? getActiveSubjectToken(activeSubject, nowMs)
+    : '';
+  const tokenCountdown =
+    activeSubject?.tokenMode === 'auto_15m'
+      ? formatTokenCountdown(getTokenSecondsRemaining(nowMs))
+      : null;
 
   const roomOptions = useMemo(
     () =>
@@ -206,9 +226,9 @@ export const ProctorControlTab: React.FC<ProctorControlTabProps> = ({
   );
 
   const handleCopyToken = async () => {
-    if (!activeSubject?.token) return;
+    if (!activeToken) return;
     try {
-      await navigator.clipboard.writeText(activeSubject.token);
+      await navigator.clipboard.writeText(activeToken);
       setCopiedToken(true);
       setTimeout(() => setCopiedToken(false), 2000);
     } catch {
@@ -289,12 +309,21 @@ export const ProctorControlTab: React.FC<ProctorControlTabProps> = ({
         {activeSubject && (
           <div className="flex items-center justify-between sm:justify-end gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
             <div>
-              <p className="text-[11px] font-medium text-blue-800 flex items-center gap-1">
+              <p className="text-[11px] font-medium text-blue-800 flex items-center gap-1.5">
                 <KeyRound className="h-3 w-3" />
-                Token Rilis Ujian
+                <span>
+                  {activeSubject.tokenMode === 'auto_15m'
+                    ? 'Token Otomatis (15m)'
+                    : 'Token Rilis Ujian'}
+                </span>
+                {tokenCountdown && (
+                  <span className="font-mono font-semibold text-blue-700">
+                    · {tokenCountdown}
+                  </span>
+                )}
               </p>
               <p className="font-mono text-base font-bold tracking-wider text-blue-950">
-                {activeSubject.token}
+                {activeToken}
               </p>
             </div>
             <button

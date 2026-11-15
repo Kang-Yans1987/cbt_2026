@@ -2,12 +2,18 @@ import {
   DEFAULT_DRIVE_FOLDER_ID,
   DEFAULT_SPREADSHEET_ID,
   type AccessCredentials,
+  type BeritaAcaraRecord,
   type ExamPackageData,
+  type ExamRoom,
+  type ExamScheduleItem,
   type ExamSessionSlot,
   type ExamSubmission,
+  type ExamTimeSettings,
+  type ProctorMappingEntry,
   type Question,
   type Student,
   type SubjectConfig,
+  type TeacherAccount,
 } from '../types/exam';
 
 export const DEFAULT_ADMIN_CREDENTIALS: AccessCredentials = {
@@ -19,6 +25,18 @@ export const DEFAULT_PROCTOR_CREDENTIALS: AccessCredentials = {
   username: 'pengawas',
   password: 'proktor2026',
 };
+
+export const DEFAULT_EXAM_TIME_SETTINGS: ExamTimeSettings = {
+  timezone: 'WIB',
+  enforceScheduleWindow: false,
+  minSubmitMinutes: 0,
+  warningMinutesBeforeEnd: 5,
+  showScoreImmediately: true,
+  examInfoNotes:
+    'Peserta wajib hadir 15 menit sebelum sesi dimulai, menyiapkan kartu nomor peserta, menjaga koneksi/kamera aktif, dan mengisi seluruh butir soal sebelum waktu berakhir.',
+};
+
+export const INITIAL_TEACHERS: TeacherAccount[] = [];
 
 function svgDataUri(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
@@ -80,6 +98,8 @@ export const INITIAL_SUBJECTS: SubjectConfig[] = [
     code: 'AKM-LITNUM',
     name: 'Asesmen Kompetensi Minimum (Literasi & Numerasi)',
     token: 'AKM2026',
+    tokenMode: 'manual',
+    tokenSeed: 'AKM2026',
     durationMinutes: 60,
     maxViolations: 3,
     passingGradeKkm: 75,
@@ -89,13 +109,15 @@ export const INITIAL_SUBJECTS: SubjectConfig[] = [
     active: true,
     startTime: '2026-11-13T07:30',
     endTime: '2026-11-13T17:00',
-    schoolName: 'SMA Negeri 1 Nusantara',
+    schoolName: 'SD Negeri 2 Tukangkayu',
   },
   {
     id: 'SUBJ-TKA-02',
     code: 'TKA-SAINTEK',
     name: 'Tes Kemampuan Akademik (TKA) Penalaran Sains',
     token: 'TKA2026',
+    tokenMode: 'manual',
+    tokenSeed: 'TKA2026',
     durationMinutes: 45,
     maxViolations: 3,
     passingGradeKkm: 75,
@@ -105,7 +127,7 @@ export const INITIAL_SUBJECTS: SubjectConfig[] = [
     active: true,
     startTime: '2026-11-13T09:30',
     endTime: '2026-11-13T17:00',
-    schoolName: 'SMA Negeri 1 Nusantara',
+    schoolName: 'SD Negeri 2 Tukangkayu',
   },
 ];
 
@@ -135,6 +157,95 @@ export const INITIAL_EXAM_SESSIONS: ExamSessionSlot[] = [
     proctorName: 'Ahmad Fauzi, S.Kom',
   },
 ];
+
+export const INITIAL_EXAM_ROOMS: ExamRoom[] = [
+  {
+    id: 'ROOM-01',
+    code: 'R-01',
+    name: 'Ruang 01',
+    capacity: 20,
+    location: 'Gedung Utama Lantai 1',
+    notes: '20 unit komputer/Chromebook + proyektor',
+  },
+  {
+    id: 'ROOM-02',
+    code: 'R-02',
+    name: 'Ruang 02',
+    capacity: 20,
+    location: 'Gedung Utama Lantai 1',
+    notes: '20 unit meja ujian + jaringan Wi-Fi lokal',
+  },
+  {
+    id: 'ROOM-LAB1',
+    code: 'LAB-01',
+    name: 'Lab Komputer 1',
+    capacity: 30,
+    location: 'Gedung Timur Lantai 2',
+    notes: '30 unit PC LAN Gigabit + kamera pengawas',
+  },
+];
+
+export const INITIAL_EXAM_SCHEDULES: ExamScheduleItem[] = [
+  {
+    id: 'SCH-01',
+    dayLabel: 'Hari ke-1 (Senin)',
+    date: '2026-11-16',
+    startTime: '07:30',
+    endTime: '09:00',
+    subjectId: 'SUBJ-AKM-01',
+    subjectName: 'Asesmen Kompetensi Minimum (Literasi & Numerasi)',
+    sessionName: 'Sesi 1 (07:30)',
+    targetClass: 'Kelas VI-A & VI-B',
+    roomSummary: 'Ruang 01, Ruang 02',
+    notes: 'Peserta hadir 15 menit sebelum dimulai.',
+  },
+  {
+    id: 'SCH-02',
+    dayLabel: 'Hari ke-1 (Senin)',
+    date: '2026-11-16',
+    startTime: '09:30',
+    endTime: '11:00',
+    subjectId: 'SUBJ-TKA-02',
+    subjectName: 'Tes Kemampuan Akademik (TKA) Penalaran Sains',
+    sessionName: 'Sesi 2 (09:30)',
+    targetClass: 'Kelas VI-A & VI-B',
+    roomSummary: 'Ruang 01, Lab Komputer 1',
+    notes: 'Siapkan kartu peserta & token ruang dari pengawas.',
+  },
+];
+
+export const INITIAL_PROCTOR_MAPPINGS: ProctorMappingEntry[] = [
+  {
+    id: 'MAP-01',
+    date: '2026-11-16',
+    sessionId: 'SESI-1',
+    sessionName: 'Sesi 1 (07:30)',
+    roomId: 'ROOM-01',
+    roomName: 'Ruang 01',
+    subjectId: 'SUBJ-AKM-01',
+    subjectName: 'Asesmen Kompetensi Minimum (Literasi & Numerasi)',
+    proctorName: 'Drs. Hendra Wijaya, M.Pd',
+    proctorNip: '197804122005011004',
+    proctorUsername: 'pengawas',
+    notes: 'Pengawas utama ruang 01',
+  },
+  {
+    id: 'MAP-02',
+    date: '2026-11-16',
+    sessionId: 'SESI-2',
+    sessionName: 'Sesi 2 (09:30)',
+    roomId: 'ROOM-02',
+    roomName: 'Ruang 02',
+    subjectId: 'SUBJ-TKA-02',
+    subjectName: 'Tes Kemampuan Akademik (TKA) Penalaran Sains',
+    proctorName: 'Siti Aminah, S.Pd',
+    proctorNip: '198607212010012011',
+    proctorUsername: 'pengawas',
+    notes: 'Pengawas ruang 02',
+  },
+];
+
+export const INITIAL_BERITA_ACARA: BeritaAcaraRecord[] = [];
 
 export const INITIAL_QUESTIONS: Question[] = [
   {
@@ -309,174 +420,30 @@ export const INITIAL_QUESTIONS: Question[] = [
   },
 ];
 
-export const INITIAL_STUDENTS: Student[] = [
-  {
-    id: 'STD-01',
-    participantNumber: '2026-01-001',
-    name: 'Aulia Rahmawati',
-    className: 'XII-IPA-1',
-    room: 'Ruang 01',
-    session: 'Sesi 1 (07:30)',
-    accessPin: '1001',
-  },
-  {
-    id: 'STD-02',
-    participantNumber: '2026-01-002',
-    name: 'Bagas Pratama Putra',
-    className: 'XII-IPA-1',
-    room: 'Ruang 01',
-    session: 'Sesi 1 (07:30)',
-    accessPin: '1002',
-  },
-  {
-    id: 'STD-03',
-    participantNumber: '2026-01-003',
-    name: 'Citra Dewi Lestari',
-    className: 'XII-IPA-1',
-    room: 'Ruang 01',
-    session: 'Sesi 1 (07:30)',
-    accessPin: '1003',
-  },
-  {
-    id: 'STD-04',
-    participantNumber: '2026-01-004',
-    name: 'Dimas Aditya Nugroho',
-    className: 'XII-IPA-2',
-    room: 'Ruang 02',
-    session: 'Sesi 1 (07:30)',
-    accessPin: '1004',
-  },
-  {
-    id: 'STD-05',
-    participantNumber: '2026-01-005',
-    name: 'Eka Nurul Hidayah',
-    className: 'XII-IPA-2',
-    room: 'Ruang 02',
-    session: 'Sesi 1 (07:30)',
-    accessPin: '1005',
-  },
-  {
-    id: 'STD-06',
-    participantNumber: '2026-01-006',
-    name: 'Fajar Maulana Hakim',
-    className: 'XII-IPA-2',
-    room: 'Ruang 02',
-    session: 'Sesi 1 (07:30)',
-    accessPin: '1006',
-  },
-];
+export const INITIAL_STUDENTS: Student[] = [];
 
-export const INITIAL_SUBMISSIONS: ExamSubmission[] = [
-  {
-    id: 'SUB-DEMO-01',
-    participantNumber: '2026-01-001',
-    studentName: 'Aulia Rahmawati',
-    className: 'XII-IPA-1',
-    subjectId: 'SUBJ-AKM-01',
-    subjectName: 'Asesmen Kompetensi Minimum (Literasi & Numerasi)',
-    answers: {
-      'Q-AKM-01': 'B',
-      'Q-AKM-02': 'A,B,C',
-      'Q-AKM-03': 'S1:true,S2:true,S3:false',
-      'Q-AKM-04': 'P1->81 cm²,P2->125 cm³,P3->2.500 m',
-      'Q-AKM-05':
-        'Menyediakan mode offline berbasis cache lokal terenkripsi dengan sinkronisasi otomatis dan mengaktifkan kunci layar penuh serta deteksi pindah tab.',
-    },
-    objectiveScore: 75,
-    aiEssayScore: 24,
-    totalScore: 99,
-    maxPossibleScore: 100,
-    percentage: 99,
-    passedKkm: true,
-    violationCount: 0,
-    violationLogs: [],
-    aiEvaluations: [
-      {
-        questionId: 'Q-AKM-05',
-        studentAnswer:
-          'Menyediakan mode offline berbasis cache lokal terenkripsi dengan sinkronisasi otomatis dan mengaktifkan kunci layar penuh serta deteksi pindah tab.',
-        score: 24,
-        maxScore: 25,
-        matchedKeywords: [
-          'mode offline',
-          'cache lokal',
-          'enkripsi',
-          'sinkronisasi otomatis',
-          'fullscreen',
-          'anti-tab',
-        ],
-        feedback:
-          'Jawaban sangat lengkap dan sesuai dengan seluruh kata kunci teknis ketahanan jaringan maupun keamanan proctoring.',
-        gradedBy: 'AI',
-      },
-    ],
-    submittedAt: '2026-11-13T08:12:00.000Z',
-    durationSeconds: 2140,
-    syncStatus: 'synced_server',
-    endReason: 'manual_submit',
-  },
-  {
-    id: 'SUB-DEMO-02',
-    participantNumber: '2026-01-004',
-    studentName: 'Dimas Aditya Nugroho',
-    className: 'XII-IPA-2',
-    subjectId: 'SUBJ-AKM-01',
-    subjectName: 'Asesmen Kompetensi Minimum (Literasi & Numerasi)',
-    answers: {
-      'Q-AKM-01': 'B',
-      'Q-AKM-02': 'A,B',
-      'Q-AKM-03': 'S1:true,S2:false,S3:false',
-      'Q-AKM-04': 'P1->81 cm²,P2->125 cm³,P3->2.500 m',
-      'Q-AKM-05':
-        'Memakai mode offline agar soal tersimpan di perangkat saat internet putus.',
-    },
-    objectiveScore: 55,
-    aiEssayScore: 14,
-    totalScore: 69,
-    maxPossibleScore: 100,
-    percentage: 69,
-    passedKkm: false,
-    violationCount: 1,
-    violationLogs: [
-      {
-        timestamp: '2026-11-13T08:05:11.000Z',
-        reason: 'Kehilangan fokus jendela (indikasi pindah tab)',
-      },
-    ],
-    aiEvaluations: [
-      {
-        questionId: 'Q-AKM-05',
-        studentAnswer:
-          'Memakai mode offline agar soal tersimpan di perangkat saat internet putus.',
-        score: 14,
-        maxScore: 25,
-        matchedKeywords: ['mode offline', 'koneksi tidak stabil'],
-        feedback:
-          'Sudah menjelaskan solusi mode offline, namun belum menyebutkan aspek enkripsi soal dan sistem anti-tab.',
-        gradedBy: 'AI',
-      },
-    ],
-    submittedAt: '2026-11-13T08:25:00.000Z',
-    durationSeconds: 2780,
-    syncStatus: 'synced_server',
-    endReason: 'manual_submit',
-  },
-];
+export const INITIAL_SUBMISSIONS: ExamSubmission[] = [];
 
 export function createInitialPackage(): ExamPackageData {
   return {
     spreadsheetId: DEFAULT_SPREADSHEET_ID,
     driveFolderId: DEFAULT_DRIVE_FOLDER_ID,
-    appTitle: 'AksaraCBT',
-    schoolName: 'SMA Negeri 1 Nusantara',
+    appTitle: 'DutawangiCBT',
+    schoolName: 'SD Negeri 2 Tukangkayu',
     schoolLogoUrl: '',
     homeThumbnailUrl: '',
     adminCredentials: { ...DEFAULT_ADMIN_CREDENTIALS },
     proctorCredentials: { ...DEFAULT_PROCTOR_CREDENTIALS },
+    teachers: INITIAL_TEACHERS,
+    examTimeSettings: { ...DEFAULT_EXAM_TIME_SETTINGS },
     subjects: INITIAL_SUBJECTS,
     questions: INITIAL_QUESTIONS,
     students: INITIAL_STUDENTS,
     examSessions: INITIAL_EXAM_SESSIONS,
+    examRooms: INITIAL_EXAM_ROOMS,
+    proctorMappings: INITIAL_PROCTOR_MAPPINGS,
+    examSchedules: INITIAL_EXAM_SCHEDULES,
+    beritaAcaraList: INITIAL_BERITA_ACARA,
     updatedAt: new Date().toISOString(),
   };
 }

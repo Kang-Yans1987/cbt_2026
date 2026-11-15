@@ -4,6 +4,7 @@ import {
   CloudCheck,
   CloudOff,
   Home,
+  Lock,
   ShieldAlert,
   Sparkles,
   XCircle,
@@ -15,6 +16,7 @@ interface StudentResultViewProps {
   schoolName: string;
   schoolLogoUrl: string;
   submission: ExamSubmission;
+  showScoreImmediately?: boolean;
   onReturnHome: () => void;
 }
 
@@ -22,19 +24,20 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
   schoolName,
   schoolLogoUrl,
   submission,
+  showScoreImmediately = true,
   onReturnHome,
 }) => {
   const endReasonText: Record<ExamSubmission['endReason'], string> = {
     manual_submit: 'Dikirim manual oleh peserta',
     time_up: 'Waktu ujian telah berakhir otomatis',
     admin_force_end: 'Diakhiri secara real-time oleh Pengawas/Admin',
-    max_violations: 'Dikunci otomatis karena melebihi batas pelanggaran tab',
+    max_violations: 'Dikunci otomatis karena melebihi batas pelanggaran',
   };
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 sm:px-6 py-6 sm:py-10 text-slate-900">
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-8 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-slate-100 pb-6">
             <div className="flex items-start gap-3">
               <SchoolLogo
@@ -53,7 +56,9 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                   <span>{endReasonText[submission.endReason]}</span>
                 </div>
                 <h1 className="mt-1.5 text-xl sm:text-2xl font-bold text-slate-900">
-                  Hasil Ujian: {submission.studentName}
+                  {showScoreImmediately
+                    ? `Hasil Ujian: ${submission.studentName}`
+                    : `Jawaban Diterima: ${submission.studentName}`}
                 </h1>
                 <p className="mt-1 text-sm text-slate-600">
                   {submission.subjectName}
@@ -61,58 +66,85 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
               </div>
             </div>
 
-            <div className="flex sm:block items-center justify-between border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0 sm:text-right">
-              <div>
-                <p className="text-xs font-medium text-slate-500">Nilai Akhir</p>
-                <p className="font-mono text-3xl sm:text-4xl font-bold text-slate-900 tabular-nums">
-                  {submission.percentage}
-                </p>
+            {showScoreImmediately ? (
+              <div className="flex sm:block items-center justify-between border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0 sm:text-right">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Nilai Akhir</p>
+                  <p className="font-mono text-3xl sm:text-4xl font-bold text-slate-900 tabular-nums">
+                    {submission.percentage}
+                  </p>
+                </div>
+                <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold">
+                  {submission.passedKkm ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-700">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Tuntas KKM
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-red-700">
+                      <XCircle className="h-4 w-4" />
+                      Belum Tuntas KKM
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold">
-                {submission.passedKkm ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-700">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Tuntas KKM
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-red-700">
-                    <XCircle className="h-4 w-4" />
-                    Belum Tuntas KKM
-                  </span>
-                )}
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-800 shrink-0">
+                <CheckCircle2 className="h-4 w-4 text-blue-700" />
+                Ujian Selesai
               </div>
-            </div>
+            )}
           </div>
 
-          <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-              <dt className="text-xs text-slate-500">Skor PG & AKM</dt>
-              <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums">
-                {submission.objectiveScore}
-              </dd>
+          {showScoreImmediately ? (
+            <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
+                <dt className="text-xs text-slate-500">Skor PG & AKM</dt>
+                <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums">
+                  {submission.objectiveScore}
+                </dd>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
+                <dt className="text-xs text-slate-500">Skor Isian AI</dt>
+                <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums">
+                  {submission.aiEssayScore}
+                </dd>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
+                <dt className="text-xs text-slate-500">Total Poin</dt>
+                <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums">
+                  {submission.totalScore} / {submission.maxPossibleScore}
+                </dd>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
+                <dt className="text-xs text-slate-500">Catatan Fokus</dt>
+                <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums flex items-center gap-1.5">
+                  {submission.violationCount > 0 && (
+                    <ShieldAlert className="h-4 w-4 text-amber-600" />
+                  )}
+                  {submission.violationCount} kali
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                <Lock className="h-5 w-5" />
+              </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-slate-900">
+                  Seluruh Jawaban Telah Berhasil Dikirim
+                </p>
+                <p className="text-xs sm:text-sm leading-relaxed text-slate-600">
+                  Sesuai pengaturan sekolah, nilai ujian tidak ditampilkan langsung kepada peserta. Hasil nilai resmi dapat dilihat melalui Guru Mata Pelajaran atau Panitia Ujian.
+                </p>
+                <p className="text-xs font-mono text-slate-500 pt-1">
+                  Durasi pengerjaan: {Math.max(1, Math.round(submission.durationSeconds / 60))} menit ·{' '}
+                  {Object.keys(submission.answers).length} soal terjawab
+                </p>
+              </div>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-              <dt className="text-xs text-slate-500">Skor Isian AI</dt>
-              <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums">
-                {submission.aiEssayScore}
-              </dd>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-              <dt className="text-xs text-slate-500">Total Poin</dt>
-              <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums">
-                {submission.totalScore} / {submission.maxPossibleScore}
-              </dd>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-              <dt className="text-xs text-slate-500">Pelanggaran Tab</dt>
-              <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums flex items-center gap-1.5">
-                {submission.violationCount > 0 && (
-                  <ShieldAlert className="h-4 w-4 text-amber-600" />
-                )}
-                {submission.violationCount} kali
-              </dd>
-            </div>
-          </dl>
+          )}
 
           <div className="mt-6 flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs">
             <div className="flex items-center gap-2 text-slate-700">
@@ -134,7 +166,7 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
             </div>
           </div>
 
-          {submission.aiEvaluations.length > 0 && (
+          {showScoreImmediately && submission.aiEvaluations.length > 0 && (
             <div className="mt-8 border-t border-slate-100 pt-6">
               <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                 <Sparkles className="h-4 w-4 text-blue-700" />
@@ -184,7 +216,7 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
             <button
               type="button"
               onClick={onReturnHome}
-              className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+              className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
             >
               <Home className="h-4 w-4" />
               Kembali ke Portal Ujian

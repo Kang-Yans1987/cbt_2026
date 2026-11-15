@@ -14,9 +14,9 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
         manifest: {
           id: '/',
-          name: 'AksaraCBT — Ujian Online AKM & TKA',
-          short_name: 'AksaraCBT',
-          description: 'Aplikasi ujian online dengan dukungan offline, anti-tab proctoring, dan korektor AI.',
+          name: 'DutawangiCBT — Ujian Online AKM & TKA',
+          short_name: 'DutawangiCBT',
+          description: 'Aplikasi ujian online dengan dukungan offline, pengawasan ruang, dan asisten AI.',
           theme_color: '#1D4ED8',
           background_color: '#F8FAFC',
           display: 'standalone',
@@ -44,6 +44,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           navigateFallback: '/index.html',
           runtimeCaching: [

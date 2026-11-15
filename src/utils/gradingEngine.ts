@@ -154,6 +154,7 @@ export async function evaluateSubmission(params: {
   durationSeconds: number;
   endReason: ExamSubmission['endReason'];
   isOnline: boolean;
+  deferAiToBackground?: boolean;
 }): Promise<ExamSubmission> {
   const {
     participantNumber,
@@ -167,6 +168,7 @@ export async function evaluateSubmission(params: {
     durationSeconds,
     endReason,
     isOnline,
+    deferAiToBackground = false,
   } = params;
 
   let objectiveScore = 0;
@@ -184,11 +186,14 @@ export async function evaluateSubmission(params: {
 
   let aiEvaluations: AiEvaluationResult[] = [];
   if (essayQuestions.length > 0) {
-    if (isOnline) {
+    if (isOnline && !deferAiToBackground) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
       try {
         const res = await fetch('/api/ai/grade-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             items: essayQuestions.map((q) => ({
               questionId: q.id,
@@ -212,6 +217,8 @@ export async function evaluateSubmission(params: {
         aiEvaluations = essayQuestions.map((q) =>
           gradeEssayLocally(q, answers[q.id] || '')
         );
+      } finally {
+        clearTimeout(timeoutId);
       }
     } else {
       aiEvaluations = essayQuestions.map((q) =>

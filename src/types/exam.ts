@@ -5,6 +5,24 @@ export type QuestionType =
   | 'MENJODOHKAN'
   | 'ISIAN';
 
+export type AdminSectionId =
+  | 'analytics'
+  | 'proctor'
+  | 'questions'
+  | 'drive'
+  | 'identity'
+  | 'subjects'
+  | 'sessions'
+  | 'rooms'
+  | 'proctor_mapping'
+  | 'schedule'
+  | 'berita_acara'
+  | 'students'
+  | 'teachers'
+  | 'print'
+  | 'sheets'
+  | 'reset';
+
 export interface MatchingPair {
   id: string;
   left: string;
@@ -46,6 +64,8 @@ export interface SubjectConfig {
   code: string;
   name: string;
   token: string;
+  tokenMode?: 'manual' | 'auto_15m';
+  tokenSeed?: string;
   durationMinutes: number;
   maxViolations: number;
   passingGradeKkm: number;
@@ -67,9 +87,90 @@ export interface ExamSessionSlot {
   proctorName?: string;
 }
 
+export interface ExamRoom {
+  id: string;
+  code: string;
+  name: string;
+  capacity: number;
+  location: string;
+  notes?: string;
+}
+
+export interface ProctorMappingEntry {
+  id: string;
+  date: string;
+  sessionId: string;
+  sessionName: string;
+  roomId: string;
+  roomName: string;
+  subjectId: string;
+  subjectName: string;
+  proctorName: string;
+  proctorNip?: string;
+  proctorUsername?: string;
+  notes?: string;
+}
+
+export interface ExamScheduleItem {
+  id: string;
+  dayLabel: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  subjectId?: string;
+  subjectName: string;
+  sessionName: string;
+  targetClass: string;
+  roomSummary: string;
+  notes?: string;
+}
+
+export interface BeritaAcaraRecord {
+  id: string;
+  documentNumber: string;
+  date: string;
+  dayName: string;
+  startTime: string;
+  endTime: string;
+  subjectName: string;
+  sessionName: string;
+  roomName: string;
+  expectedCount: number;
+  presentCount: number;
+  absentCount: number;
+  absentParticipantNumbers: string;
+  incidentNotes: string;
+  proctorName: string;
+  proctorNip?: string;
+  principalName: string;
+  principalNip?: string;
+  city: string;
+  createdAt: string;
+}
+
 export interface AccessCredentials {
   username: string;
   password: string;
+}
+
+export interface TeacherAccount {
+  id: string;
+  nip?: string;
+  name: string;
+  subjectSpecialty: string;
+  username: string;
+  password: string;
+  active: boolean;
+  allowedMenus?: AdminSectionId[];
+}
+
+export interface ExamTimeSettings {
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  enforceScheduleWindow: boolean;
+  minSubmitMinutes: number;
+  warningMinutesBeforeEnd: number;
+  showScoreImmediately?: boolean;
+  examInfoNotes?: string;
 }
 
 export interface Student {
@@ -80,6 +181,7 @@ export interface Student {
   room: string;
   session: string;
   accessPin: string;
+  photoUrl?: string;
 }
 
 export interface ViolationLog {
@@ -188,10 +290,16 @@ export interface ExamPackageData {
   homeThumbnailUrl?: string;
   adminCredentials?: AccessCredentials;
   proctorCredentials?: AccessCredentials;
+  teachers?: TeacherAccount[];
+  examTimeSettings?: ExamTimeSettings;
   subjects: SubjectConfig[];
   questions: Question[];
   students: Student[];
   examSessions?: ExamSessionSlot[];
+  examRooms?: ExamRoom[];
+  proctorMappings?: ProctorMappingEntry[];
+  examSchedules?: ExamScheduleItem[];
+  beritaAcaraList?: BeritaAcaraRecord[];
   updatedAt: string;
 }
 

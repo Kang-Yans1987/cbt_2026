@@ -1,11 +1,17 @@
 import type {
   AccessCredentials,
+  BeritaAcaraRecord,
   ExamPackageData,
+  ExamRoom,
+  ExamScheduleItem,
   ExamSessionSlot,
   ExamSubmission,
+  ExamTimeSettings,
+  ProctorMappingEntry,
   Question,
   Student,
   SubjectConfig,
+  TeacherAccount,
 } from '../types/exam';
 
 export interface SpreadsheetMetadata {
@@ -20,8 +26,11 @@ const REQUIRED_TABS = {
   SOAL: 'Soal',
   PENGATURAN: 'Pengaturan_Ujian',
   PESERTA: 'Peserta',
+  GURU: 'Guru',
   HASIL: 'Hasil_Ujian',
 } as const;
+
+const initializedSpreadsheets = new Set<string>();
 
 function formatGoogleApiError(status: number, rawBody: string): string {
   let detail = '';
@@ -135,14 +144,20 @@ export async function pullAllFromSheets(
   subjects: SubjectConfig[];
   questions: Question[];
   students: Student[];
+  teachers: TeacherAccount[];
   submissions: ExamSubmission[];
   schoolLogoUrl?: string;
   homeThumbnailUrl?: string;
   appTitle?: string;
   schoolName?: string;
   examSessions?: ExamSessionSlot[];
+  examRooms?: ExamRoom[];
+  proctorMappings?: ProctorMappingEntry[];
+  examSchedules?: ExamScheduleItem[];
+  beritaAcaraList?: BeritaAcaraRecord[];
   adminCredentials?: AccessCredentials;
   proctorCredentials?: AccessCredentials;
+  examTimeSettings?: ExamTimeSettings;
 }> {
   const metadata = await fetchSpreadsheetMetadata(spreadsheetId, accessToken);
   const tabSet = new Set(metadata.sheetNames);
@@ -151,17 +166,18 @@ export async function pullAllFromSheets(
     if (!tabSet.has(tabName)) return [];
     const resp = await sheetsFetch<{ values?: string[][] }>(
       `${SHEETS_BASE}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(
-        `${tabName}!A1:Z1000`
+        `${tabName}!A1:AD1000`
       )}`,
       accessToken
     );
     return resp.values || [];
   };
 
-  const [subjRows, soalRows, pesertaRows, hasilRows] = await Promise.all([
+  const [subjRows, soalRows, pesertaRows, guruRows, hasilRows] = await Promise.all([
     readRange(REQUIRED_TABS.PENGATURAN),
     readRange(REQUIRED_TABS.SOAL),
     readRange(REQUIRED_TABS.PESERTA),
+    readRange(REQUIRED_TABS.GURU),
     readRange(REQUIRED_TABS.HASIL),
   ]);
 
@@ -181,8 +197,10 @@ export async function pullAllFromSheets(
       active: String(r[9] || 'true').toLowerCase() === 'true',
       startTime: r[10] || '',
       endTime: r[11] || '',
-      schoolName: r[12] || 'SMA Negeri 1 Nusantara',
+      schoolName: r[12] || 'SD Negeri 2 Tukangkayu',
       cameraRequired: r[15] ? String(r[15]).toLowerCase() !== 'false' : true,
+      tokenMode: r[21] === 'auto_15m' ? 'auto_15m' : 'manual',
+      tokenSeed: r[22] || r[3] || 'DUTAWANGI',
     }));
 
   const firstSubjRow = subjRows[1] || [];
@@ -202,6 +220,26 @@ export async function pullAllFromSheets(
     undefined
   );
   const homeThumbnailUrl = firstSubjRow[19] || undefined;
+  const examTimeSettings = safeJsonParse<ExamTimeSettings | undefined>(
+    firstSubjRow[20],
+    undefined
+  );
+  const examRooms = safeJsonParse<ExamRoom[] | undefined>(
+    firstSubjRow[23],
+    undefined
+  );
+  const proctorMappings = safeJsonParse<ProctorMappingEntry[] | undefined>(
+    firstSubjRow[24],
+    undefined
+  );
+  const examSchedules = safeJsonParse<ExamScheduleItem[] | undefined>(
+    firstSubjRow[25],
+    undefined
+  );
+  const beritaAcaraList = safeJsonParse<BeritaAcaraRecord[] | undefined>(
+    firstSubjRow[26],
+    undefined
+  );
 
   const questions: Question[] = soalRows
     .slice(1)
@@ -239,6 +277,21 @@ export async function pullAllFromSheets(
       room: r[4] || 'Ruang 01',
       session: r[5] || 'Sesi 1',
       accessPin: r[6] || '1234',
+      photoUrl: r[7] || undefined,
+    }));
+
+  const teachers: TeacherAccount[] = guruRows
+    .slice(1)
+    .filter((r) => r[0] && r[4])
+    .map((r) => ({
+      id: r[0],
+      nip: r[1] || undefined,
+      name: r[2] || 'Guru',
+      subjectSpecialty: r[3] || 'Umum',
+      username: r[4],
+      password: r[5] || '',
+      active: String(r[6] || 'true').toLowerCase() !== 'false',
+      allowedMenus: safeJsonParse<TeacherAccount['allowedMenus']>(r[7], undefined),
     }));
 
   const submissions: ExamSubmission[] = hasilRows
@@ -272,14 +325,20 @@ export async function pullAllFromSheets(
     subjects,
     questions,
     students,
+    teachers,
     submissions,
     schoolLogoUrl,
     homeThumbnailUrl,
     appTitle,
     schoolName,
     examSessions,
+    examRooms,
+    proctorMappings,
+    examSchedules,
+    beritaAcaraList,
     adminCredentials,
     proctorCredentials,
+    examTimeSettings,
   };
 }
 
@@ -297,7 +356,7 @@ export async function pushAllToSheets(
   ) => {
     await sheetsFetch(
       `${SHEETS_BASE}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(
-        `${tabName}!A1:Z1000`
+        `${tabName}!A1:AD1000`
       )}:clear`,
       accessToken,
       { method: 'POST', body: JSON.stringify({}) }
@@ -336,6 +395,13 @@ export async function pushAllToSheets(
       'Admin_Auth_JSON',
       'Proktor_Auth_JSON',
       'Thumbnail_Beranda',
+      'Pengaturan_Waktu_JSON',
+      'Mode_Token',
+      'Seed_Token',
+      'Ruang_JSON',
+      'Pemetaan_Pengawas_JSON',
+      'Jadwal_Pelaksanaan_JSON',
+      'Berita_Acara_JSON',
     ],
     ...pkg.subjects.map((s, idx) => [
       s.id,
@@ -352,7 +418,7 @@ export async function pushAllToSheets(
       s.endTime,
       pkg.schoolName || s.schoolName,
       idx === 0 ? pkg.schoolLogoUrl || '' : '',
-      idx === 0 ? pkg.appTitle || 'AksaraCBT' : '',
+      idx === 0 ? pkg.appTitle || 'DutawangiCBT' : '',
       s.cameraRequired !== false,
       idx === 0 ? JSON.stringify(pkg.examSessions || []) : '',
       idx === 0 && pkg.adminCredentials
@@ -362,6 +428,15 @@ export async function pushAllToSheets(
         ? JSON.stringify(pkg.proctorCredentials)
         : '',
       idx === 0 ? pkg.homeThumbnailUrl || '' : '',
+      idx === 0 && pkg.examTimeSettings
+        ? JSON.stringify(pkg.examTimeSettings)
+        : '',
+      s.tokenMode || 'manual',
+      s.tokenSeed || s.token || '',
+      idx === 0 ? JSON.stringify(pkg.examRooms || []) : '',
+      idx === 0 ? JSON.stringify(pkg.proctorMappings || []) : '',
+      idx === 0 ? JSON.stringify(pkg.examSchedules || []) : '',
+      idx === 0 ? JSON.stringify(pkg.beritaAcaraList || []) : '',
     ]),
   ];
 
@@ -411,7 +486,7 @@ export async function pushAllToSheets(
   ];
 
   const pesertaValues = [
-    ['ID', 'No_Peserta', 'Nama_Siswa', 'Kelas', 'Ruang', 'Sesi', 'PIN_Akses'],
+    ['ID', 'No_Peserta', 'Nama_Siswa', 'Kelas', 'Ruang', 'Sesi', 'PIN_Akses', 'Foto_URL'],
     ...pkg.students.map((st) => [
       st.id,
       st.participantNumber,
@@ -420,6 +495,7 @@ export async function pushAllToSheets(
       st.room,
       st.session,
       st.accessPin,
+      st.photoUrl || '',
     ]),
   ];
 
@@ -468,10 +544,35 @@ export async function pushAllToSheets(
     ]),
   ];
 
+  const guruValues = [
+    [
+      'ID_Guru',
+      'NIP',
+      'Nama_Guru',
+      'Mapel_Diampu',
+      'Username',
+      'Password',
+      'Aktif',
+      'Hak_Akses_Menu_JSON',
+    ],
+    ...(pkg.teachers || []).map((t) => [
+      t.id,
+      t.nip || '',
+      t.name,
+      t.subjectSpecialty,
+      t.username,
+      t.password,
+      t.active,
+      JSON.stringify(t.allowedMenus || []),
+    ]),
+  ];
+
+  initializedSpreadsheets.add(spreadsheetId);
   await Promise.all([
     writeTab(REQUIRED_TABS.PENGATURAN, subjValues),
     writeTab(REQUIRED_TABS.SOAL, soalValues),
     writeTab(REQUIRED_TABS.PESERTA, pesertaValues),
+    writeTab(REQUIRED_TABS.GURU, guruValues),
     writeTab(REQUIRED_TABS.HASIL, hasilValues),
   ]);
 }
@@ -481,7 +582,10 @@ export async function appendSubmissionToSheet(
   accessToken: string,
   sub: ExamSubmission
 ): Promise<void> {
-  await initializeExamTabs(spreadsheetId, accessToken);
+  if (!initializedSpreadsheets.has(spreadsheetId)) {
+    await initializeExamTabs(spreadsheetId, accessToken);
+    initializedSpreadsheets.add(spreadsheetId);
+  }
   const row = [
     sub.id,
     sub.participantNumber,

@@ -22,6 +22,7 @@ import {
 import type {
   CameraStatus,
   ExamSubmission,
+  ExamTimeSettings,
   ProctorActionPayload,
   Question,
   Student,
@@ -43,6 +44,7 @@ interface StudentExamRunnerProps {
   subject: SubjectConfig;
   questions: Question[];
   accessToken?: string | null;
+  examTimeSettings?: ExamTimeSettings;
   onComplete: (submission: ExamSubmission) => void;
   onExit: () => void;
 }
@@ -60,6 +62,7 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
   subject,
   questions,
   accessToken,
+  examTimeSettings,
   onComplete,
   onExit,
 }) => {
@@ -151,6 +154,14 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
       setSubmitError(null);
       setConfirmSubmitOpen(false);
 
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+        cameraStreamRef.current = null;
+      }
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+
       const elapsedSeconds = Math.max(
         1,
         subject.durationMinutes * 60 - remainingRef.current
@@ -169,16 +180,12 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
           durationSeconds: elapsedSeconds,
           endReason,
           isOnline,
+          deferAiToBackground: examTimeSettings?.showScoreImmediately === false,
         });
 
-        await clearActiveAttempt(student.participantNumber, subject.id);
-        if (cameraStreamRef.current) {
-          cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-          cameraStreamRef.current = null;
-        }
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
-        }
+        clearActiveAttempt(student.participantNumber, subject.id).catch(
+          () => {}
+        );
         onComplete(result);
       } catch (err) {
         submittedRef.current = false;
@@ -190,7 +197,14 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
         );
       }
     },
-    [student, subject, orderedQuestions, isOnline, onComplete]
+    [
+      student,
+      subject,
+      orderedQuestions,
+      isOnline,
+      examTimeSettings?.showScoreImmediately,
+      onComplete,
+    ]
   );
 
   const stopCameraStream = useCallback(() => {
@@ -362,26 +376,33 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
     return () => clearInterval(timer);
   }, [finishExam, orderedQuestions.length]);
 
+  const lastHeartbeatAtRef = useRef(0);
+  const lastUrgentSigRef = useRef('');
+
   useEffect(() => {
     const answeredCount = Object.values(answers).filter(
       (v) => v && v.trim().length > 0
     ).length;
 
-    saveActiveAttempt({
-      attemptKey: `${student.participantNumber}::${subject.id}`,
-      participantNumber: student.participantNumber,
-      subjectId: subject.id,
-      answers,
-      flaggedIds,
-      currentIndex,
-      remainingSeconds,
-      violationCount,
-      violationLogs,
-      startedAt,
-      updatedAt: new Date().toISOString(),
-    }).catch(() => {});
+    const saveTimer = window.setTimeout(() => {
+      saveActiveAttempt({
+        attemptKey: `${student.participantNumber}::${subject.id}`,
+        participantNumber: student.participantNumber,
+        subjectId: subject.id,
+        answers,
+        flaggedIds,
+        currentIndex,
+        remainingSeconds: remainingRef.current,
+        violationCount,
+        violationLogs,
+        startedAt,
+        updatedAt: new Date().toISOString(),
+      }).catch(() => {});
+    }, 500);
 
-    if (isOnline) {
+    const sendHeartbeat = () => {
+      if (!isOnline) return;
+      lastHeartbeatAtRef.current = Date.now();
       fetch('/api/proctor/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -404,7 +425,29 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
           startedAt,
         }),
       }).catch(() => {});
+    };
+
+    const urgentSig = `${violationCount}::${cameraStatus}::${isOnline}`;
+    const isUrgent = urgentSig !== lastUrgentSigRef.current;
+    lastUrgentSigRef.current = urgentSig;
+
+    let hbTimer: number | undefined;
+    if (isOnline) {
+      const elapsedSinceLast = Date.now() - lastHeartbeatAtRef.current;
+      if (isUrgent || elapsedSinceLast >= 2500) {
+        sendHeartbeat();
+      } else {
+        hbTimer = window.setTimeout(
+          sendHeartbeat,
+          Math.max(400, 2500 - elapsedSinceLast)
+        );
+      }
     }
+
+    return () => {
+      window.clearTimeout(saveTimer);
+      if (hbTimer) window.clearTimeout(hbTimer);
+    };
   }, [
     answers,
     flaggedIds,
@@ -458,7 +501,20 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
     (q) => (answers[q.id] || '').trim().length > 0
   ).length;
 
-  const isLowTime = remainingSeconds <= 300;
+  const warningSeconds =
+    Math.max(1, examTimeSettings?.warningMinutesBeforeEnd ?? 5) * 60;
+  const isLowTime = remainingSeconds <= warningSeconds;
+
+  const elapsedSecondsNow = Math.max(
+    0,
+    subject.durationMinutes * 60 - remainingSeconds
+  );
+  const minSubmitSeconds =
+    Math.max(0, examTimeSettings?.minSubmitMinutes ?? 0) * 60;
+  const canManualSubmit = elapsedSecondsNow >= minSubmitSeconds;
+  const remainingUntilSubmitMin = Math.ceil(
+    Math.max(0, minSubmitSeconds - elapsedSecondsNow) / 60
+  );
 
   if (orderedQuestions.length === 0) {
     return (
@@ -598,8 +654,21 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
 
             <button
               type="button"
-              onClick={() => setConfirmSubmitOpen(true)}
+              onClick={() => {
+                if (!canManualSubmit) {
+                  setSubmitError(
+                    `Tombol selesai baru terbuka dalam ${remainingUntilSubmitMin} menit (ketentuan minimal pengerjaan ${examTimeSettings?.minSubmitMinutes} menit).`
+                  );
+                  return;
+                }
+                setConfirmSubmitOpen(true);
+              }}
               disabled={submitting}
+              title={
+                canManualSubmit
+                  ? 'Kumpulkan ujian'
+                  : `Tunggu ${remainingUntilSubmitMin} menit lagi sebelum selesai`
+              }
               className="inline-flex min-h-[36px] sm:min-h-[38px] items-center gap-1.5 rounded-lg bg-emerald-600 px-3 sm:px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 whitespace-nowrap shrink-0 disabled:opacity-60"
             >
               <Send className="h-3.5 w-3.5" />
@@ -1471,7 +1540,11 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
       <ConfirmDialog
         open={confirmSubmitOpen}
         title="Kirim Jawaban & Akhiri Ujian?"
-        description={`Anda telah menjawab ${answeredCount} dari ${orderedQuestions.length} soal. Setelah dikirim, nilai objektif & koreksi Asisten AI akan langsung ditampilkan.`}
+        description={
+          examTimeSettings?.showScoreImmediately === false
+            ? `Anda telah menjawab ${answeredCount} dari ${orderedQuestions.length} soal. Setelah dikirim, jawaban Anda langsung disimpan ke sistem dan pengawas.`
+            : `Anda telah menjawab ${answeredCount} dari ${orderedQuestions.length} soal. Setelah dikirim, jawaban segera disimpan dan hasil ujian langsung ditampilkan.`
+        }
         confirmLabel="Ya, Kirim Sekarang"
         cancelLabel="Lanjutkan Mengerjakan"
         loading={submitting}

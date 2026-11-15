@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { type Request, type Response } from 'express';
 import path from 'node:path';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -173,6 +173,7 @@ async function gradeSingleEssayWithAi(
       model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         systemInstruction:
           'Anda adalah asisten korektor ujian sekolah yang objektif dan presisi. Nilai jawaban isian siswa berdasarkan kata kunci guru dan substansi makna, meskipun siswa menggunakan sinonim yang tepat.',
         responseMimeType: 'application/json',
@@ -266,6 +267,254 @@ app.post('/api/ai/grade-batch', async (req: Request, res: Response) => {
   } catch (err) {
     res.status(500).json({
       error: err instanceof Error ? err.message : 'Gagal memproses batch koreksi AI.',
+    });
+  }
+});
+
+interface GenerateQuestionsRequest {
+  subjectId: string;
+  subjectName: string;
+  topic: string;
+  questionType: 'PG' | 'PG_KOMPLEKS' | 'BENAR_SALAH' | 'MENJODOHKAN' | 'ISIAN' | 'CAMPURAN';
+  difficulty?: string;
+  gradeLevel?: string;
+  count?: number;
+  weight?: number;
+  startingNumber?: number;
+}
+
+// AI Assistant question generator endpoint
+app.post('/api/ai/generate-questions', async (req: Request, res: Response) => {
+  try {
+    const body = req.body as GenerateQuestionsRequest;
+    const topic = (body?.topic || '').trim();
+    if (!topic) {
+      res.status(400).json({ error: 'Materi atau topik soal wajib diisi.' });
+      return;
+    }
+
+    if (!ai) {
+      res.status(503).json({
+        error:
+          'Asisten AI belum aktif karena GEMINI_API_KEY belum terkonfigurasi di server.',
+      });
+      return;
+    }
+
+    const count = Math.max(1, Math.min(10, Number(body.count) || 3));
+    const weight = Math.max(1, Number(body.weight) || 20);
+    const startingNumber = Math.max(1, Number(body.startingNumber) || 1);
+    const qType = body.questionType || 'PG';
+    const difficulty = body.difficulty || 'Sedang';
+    const gradeLevel = body.gradeLevel || 'SMP / SMA';
+    const subjectName = body.subjectName || 'Umum';
+
+    const typeInstruction =
+      qType === 'CAMPURAN'
+        ? 'Variasikan jenis soal menggunakan tipe: PG, PG_KOMPLEKS, BENAR_SALAH, MENJODOHKAN, dan ISIAN.'
+        : `Seluruh soal WAJIB bertipe "${qType}".`;
+
+    const promptText = [
+      `Buatkan tepat ${count} butir soal asesmen berkualitas tinggi berbahasa Indonesia.`,
+      `Mata Pelajaran: ${subjectName}`,
+      `Jenjang/Kelas: ${gradeLevel}`,
+      `Materi / Topik / KD: ${topic}`,
+      `Tingkat Kesulitan: ${difficulty}`,
+      typeInstruction,
+      '',
+      'Aturan format ketat tiap jenis soal:',
+      '- PG: isi `options` dengan 4 pilihan diawali "A. ", "B. ", "C. ", "D. ", dan `correctAnswer` berisi 1 huruf kapital (contoh: "B").',
+      '- PG_KOMPLEKS: isi `options` dengan 4 pilihan diawali "A. " s.d. "D. ", dan `correctAnswer` berisi minimal 2 huruf jawaban benar dipisah koma (contoh: "A,C").',
+      '- BENAR_SALAH: isi `statements` (2-3 item dengan `id`: "S1","S2",..., `text`, `isTrue`: boolean) dan `correctAnswer` format "S1:true,S2:false".',
+      '- MENJODOHKAN: isi `matchingPairs` (3 item dengan `id`: "P1","P2","P3", `left`, `right`) dan `correctAnswer` format "P1->kanan1,P2->kanan2".',
+      '- ISIAN: kosongkan `options`, isi `correctAnswer` dengan jawaban referensi guru yang jelas, dan isi `aiKeywords` dengan 4-6 kata kunci dipisah koma.',
+      '- Setiap soal sebaiknya memiliki `stimulus` (konteks singkat AKM/literasi/numerasi) jika relevan dan `akmDomain` yang spesifik.',
+    ].join('\n');
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: promptText,
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        systemInstruction:
+          'Anda adalah guru profesional dan penulis soal standar AKM/TKA Indonesia. Buat soal yang akurat, logis, bebas bias, dan lengkap dengan kunci jawabannya dalam JSON.',
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              type: {
+                type: Type.STRING,
+                description:
+                  'Salah satu dari: PG, PG_KOMPLEKS, BENAR_SALAH, MENJODOHKAN, ISIAN',
+              },
+              akmDomain: {
+                type: Type.STRING,
+                description: 'Domain atau kompetensi soal',
+              },
+              stimulus: {
+                type: Type.STRING,
+                description: 'Wacana atau konteks stimulus singkat sebelum pertanyaan',
+              },
+              prompt: {
+                type: Type.STRING,
+                description: 'Pertanyaan utama soal',
+              },
+              options: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: '4 opsi jawaban untuk PG atau PG_KOMPLEKS',
+              },
+              statements: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    text: { type: Type.STRING },
+                    isTrue: { type: Type.BOOLEAN },
+                  },
+                  required: ['id', 'text', 'isTrue'],
+                },
+              },
+              matchingPairs: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    left: { type: Type.STRING },
+                    right: { type: Type.STRING },
+                  },
+                  required: ['id', 'left', 'right'],
+                },
+              },
+              correctAnswer: {
+                type: Type.STRING,
+                description: 'Kunci jawaban sesuai format tipe soal',
+              },
+              aiKeywords: {
+                type: Type.STRING,
+                description: 'Kata kunci penilaian AI untuk tipe ISIAN',
+              },
+            },
+            required: ['type', 'akmDomain', 'prompt', 'correctAnswer'],
+          },
+        },
+      },
+    });
+
+    const rawList = JSON.parse((response.text || '[]').trim()) as Array<{
+      type?: string;
+      akmDomain?: string;
+      stimulus?: string;
+      prompt?: string;
+      options?: string[];
+      statements?: Array<{ id?: string; text?: string; isTrue?: boolean }>;
+      matchingPairs?: Array<{ id?: string; left?: string; right?: string }>;
+      correctAnswer?: string;
+      aiKeywords?: string;
+    }>;
+
+    const validTypes = new Set([
+      'PG',
+      'PG_KOMPLEKS',
+      'BENAR_SALAH',
+      'MENJODOHKAN',
+      'ISIAN',
+    ]);
+
+    const normalized = rawList.map((item, idx) => {
+      const normalizedType = validTypes.has((item.type || '').toUpperCase())
+        ? (item.type || 'PG').toUpperCase()
+        : qType === 'CAMPURAN'
+        ? 'PG'
+        : qType;
+
+      const statements =
+        normalizedType === 'BENAR_SALAH'
+          ? (item.statements && item.statements.length > 0
+              ? item.statements
+              : [
+                  { id: 'S1', text: 'Pernyataan 1', isTrue: true },
+                  { id: 'S2', text: 'Pernyataan 2', isTrue: false },
+                ]
+            ).map((s, si) => ({
+              id: s.id || `S${si + 1}`,
+              text: s.text || `Pernyataan ${si + 1}`,
+              isTrue: Boolean(s.isTrue),
+            }))
+          : undefined;
+
+      const matchingPairs =
+        normalizedType === 'MENJODOHKAN'
+          ? (item.matchingPairs && item.matchingPairs.length > 0
+              ? item.matchingPairs
+              : [
+                  { id: 'P1', left: 'Premis 1', right: 'Pasangan 1' },
+                  { id: 'P2', left: 'Premis 2', right: 'Pasangan 2' },
+                ]
+            ).map((p, pi) => ({
+              id: p.id || `P${pi + 1}`,
+              left: p.left || `Item ${pi + 1}`,
+              right: p.right || `Pasangan ${pi + 1}`,
+            }))
+          : undefined;
+
+      let correctAnswer = (item.correctAnswer || '').trim();
+      if (normalizedType === 'BENAR_SALAH' && statements) {
+        correctAnswer = statements
+          .map((s) => `${s.id}:${s.isTrue ? 'true' : 'false'}`)
+          .join(',');
+      } else if (normalizedType === 'MENJODOHKAN' && matchingPairs) {
+        correctAnswer = matchingPairs.map((p) => `${p.id}->${p.right}`).join(',');
+      } else if (normalizedType === 'PG' && !correctAnswer) {
+        correctAnswer = 'A';
+      } else if (normalizedType === 'PG_KOMPLEKS' && !correctAnswer) {
+        correctAnswer = 'A,B';
+      }
+
+      const options =
+        normalizedType === 'PG' || normalizedType === 'PG_KOMPLEKS'
+          ? (item.options && item.options.length > 0
+              ? item.options
+              : ['A. Pilihan A', 'B. Pilihan B', 'C. Pilihan C', 'D. Pilihan D']
+            ).map((opt, oi) => {
+              const letter = String.fromCharCode(65 + oi);
+              const trimmed = opt.trim();
+              return /^[A-E]\.\s*/.test(trimmed) ? trimmed : `${letter}. ${trimmed}`;
+            })
+          : [];
+
+      return {
+        id: `Q-AI-${Date.now()}-${idx}`,
+        subjectId: body.subjectId,
+        number: startingNumber + idx,
+        type: normalizedType,
+        akmDomain: item.akmDomain || `${subjectName} · AI Asisten`,
+        stimulus: item.stimulus || undefined,
+        prompt: item.prompt || `Soal ${startingNumber + idx} (${topic})`,
+        options,
+        statements,
+        matchingPairs,
+        correctAnswer,
+        aiKeywords:
+          normalizedType === 'ISIAN'
+            ? item.aiKeywords || correctAnswer
+            : undefined,
+        weight,
+      };
+    });
+
+    res.json({ questions: normalized });
+  } catch (err) {
+    console.error('Gemini question generation error:', err);
+    res.status(500).json({
+      error:
+        err instanceof Error
+          ? err.message
+          : 'Gagal membuat soal menggunakan Asisten AI.',
     });
   }
 });
@@ -552,7 +801,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`AksaraCBT Server listening on http://0.0.0.0:${PORT}`);
+    console.log(`DutawangiCBT Server listening on http://0.0.0.0:${PORT}`);
   });
 }
 

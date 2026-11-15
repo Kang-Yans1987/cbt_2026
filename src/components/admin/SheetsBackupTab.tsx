@@ -94,7 +94,7 @@ export const SheetsBackupTab: React.FC<SheetsBackupTabProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Backup_Terenkripsi_AksaraCBT_${new Date()
+      a.download = `Backup_Terenkripsi_DutawangiCBT_${new Date()
         .toISOString()
         .slice(0, 10)}.cbtenc`;
       a.click();
@@ -125,7 +125,7 @@ export const SheetsBackupTab: React.FC<SheetsBackupTabProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Backup_AksaraCBT_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `Backup_DutawangiCBT_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       setStatusMsg('Backup JSON lengkap berhasil diunduh.');
