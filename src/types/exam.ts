@@ -72,6 +72,7 @@ export interface SubjectConfig {
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
   cameraRequired?: boolean;
+  showScoreImmediately?: boolean;
   active: boolean;
   startTime: string;
   endTime: string;

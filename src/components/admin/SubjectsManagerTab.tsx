@@ -269,6 +269,39 @@ export const SubjectsManagerTab: React.FC<SubjectsManagerTabProps> = ({
                 className="mt-1 w-full min-h-[40px] rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs sm:text-sm"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Tampilan Hasil Ujian Peserta
+              </label>
+              <select
+                value={
+                  editingSubject.showScoreImmediately === true
+                    ? 'show'
+                    : editingSubject.showScoreImmediately === false
+                    ? 'hide'
+                    : 'inherit'
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditingSubject({
+                    ...editingSubject,
+                    showScoreImmediately:
+                      val === 'show' ? true : val === 'hide' ? false : undefined,
+                  });
+                }}
+                className="mt-1 w-full min-h-[40px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm"
+              >
+                <option value="inherit">
+                  Ikuti Pengaturan Umum (
+                  {examTimeSettings.showScoreImmediately !== false
+                    ? 'Langsung Tampil'
+                    : 'Tidak Ditampilkan'}
+                  )
+                </option>
+                <option value="show">Langsung Ditampilkan Setelah Selesai</option>
+                <option value="hide">Tidak Ditampilkan ke Peserta</option>
+              </select>
+            </div>
             <div className="flex flex-wrap items-center gap-4 pt-2 sm:col-span-3">
               <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
                 <input
@@ -395,7 +428,14 @@ export const SubjectsManagerTab: React.FC<SubjectsManagerTabProps> = ({
                         {subj.cameraRequired !== false
                           ? 'Kamera Otomatis'
                           : 'Tanpa Kamera'}
-                        {subj.shuffleQuestions ? ' · Acak Soal' : ''}
+                        {subj.shuffleQuestions ? ' · Acak Soal' : ''} ·{' '}
+                        {(
+                          subj.showScoreImmediately !== undefined
+                            ? subj.showScoreImmediately
+                            : examTimeSettings.showScoreImmediately !== false
+                        )
+                          ? 'Hasil Langsung Tampil'
+                          : 'Hasil Disembunyikan'}
                       </p>
                     </td>
 

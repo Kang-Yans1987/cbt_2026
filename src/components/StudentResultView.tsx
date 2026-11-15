@@ -3,10 +3,10 @@ import {
   CheckCircle2,
   CloudCheck,
   CloudOff,
+  FileCheck2,
   Home,
   Lock,
   ShieldAlert,
-  Sparkles,
   XCircle,
 } from 'lucide-react';
 import type { ExamSubmission } from '../types/exam';
@@ -105,7 +105,7 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                 </dd>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
-                <dt className="text-xs text-slate-500">Skor Isian AI</dt>
+                <dt className="text-xs text-slate-500">Skor Isian</dt>
                 <dd className="mt-1 font-mono text-lg font-bold text-slate-900 tabular-nums">
                   {submission.aiEssayScore}
                 </dd>
@@ -169,8 +169,8 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
           {showScoreImmediately && submission.aiEvaluations.length > 0 && (
             <div className="mt-8 border-t border-slate-100 pt-6">
               <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                <Sparkles className="h-4 w-4 text-blue-700" />
-                Rincian Koreksi Soal Isian (Asisten AI)
+                <FileCheck2 className="h-4 w-4 text-blue-700" />
+                Rincian Koreksi Soal Isian
               </h2>
               <div className="mt-4 space-y-4">
                 {submission.aiEvaluations.map((ev, idx) => (
@@ -182,7 +182,7 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                       <span className="font-mono font-semibold text-slate-700">
                         Butir Isian #{idx + 1} ·{' '}
                         {ev.gradedBy === 'AI'
-                          ? 'Korektor Asisten AI'
+                          ? 'Koreksi Otomatis'
                           : 'Koreksi Kata Kunci Offline'}
                       </span>
                       <span className="font-mono font-bold text-blue-700 tabular-nums">

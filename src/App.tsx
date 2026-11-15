@@ -750,6 +750,11 @@ export default function App() {
           )}
           accessToken={accessToken}
           examTimeSettings={examPackage.examTimeSettings}
+          showScoreImmediately={
+            activeSubject.showScoreImmediately !== undefined
+              ? activeSubject.showScoreImmediately
+              : examPackage.examTimeSettings?.showScoreImmediately !== false
+          }
           onComplete={handleCompleteExam}
           onExit={() => {
             setActiveStudent(null);
@@ -759,22 +764,29 @@ export default function App() {
         />
       )}
 
-      {view === 'result' && latestSubmission && (
-        <StudentResultView
-          schoolName={schoolName}
-          schoolLogoUrl={schoolLogoUrl}
-          submission={latestSubmission}
-          showScoreImmediately={
-            examPackage.examTimeSettings?.showScoreImmediately !== false
-          }
-          onReturnHome={() => {
-            setLatestSubmission(null);
-            setActiveStudent(null);
-            setActiveSubject(null);
-            setView('portal');
-          }}
-        />
-      )}
+      {view === 'result' && latestSubmission && (() => {
+        const resultSubject = examPackage.subjects.find(
+          (s) => s.id === latestSubmission.subjectId
+        );
+        const resultShowScoreImmediately =
+          resultSubject?.showScoreImmediately !== undefined
+            ? resultSubject.showScoreImmediately
+            : examPackage.examTimeSettings?.showScoreImmediately !== false;
+        return (
+          <StudentResultView
+            schoolName={schoolName}
+            schoolLogoUrl={schoolLogoUrl}
+            submission={latestSubmission}
+            showScoreImmediately={resultShowScoreImmediately}
+            onReturnHome={() => {
+              setLatestSubmission(null);
+              setActiveStudent(null);
+              setActiveSubject(null);
+              setView('portal');
+            }}
+          />
+        );
+      })()}
 
       {view === 'proctor' && (
         <ProctorStandaloneView

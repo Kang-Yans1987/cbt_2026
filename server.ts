@@ -175,7 +175,7 @@ async function gradeSingleEssayWithAi(
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         systemInstruction:
-          'Anda adalah asisten korektor ujian sekolah yang objektif dan presisi. Nilai jawaban isian siswa berdasarkan kata kunci guru dan substansi makna, meskipun siswa menggunakan sinonim yang tepat.',
+          'Anda adalah korektor ujian sekolah yang objektif dan presisi. Nilai jawaban isian siswa berdasarkan kata kunci guru dan substansi makna, meskipun siswa menggunakan sinonim yang tepat. Jangan menyebut diri sebagai AI atau asisten AI dalam teks umpan balik.',
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
@@ -219,7 +219,7 @@ async function gradeSingleEssayWithAi(
         ? parsed.matchedKeywords
         : [],
       feedback:
-        parsed.feedback || 'Dinilai otomatis oleh Asisten AI berdasarkan kata kunci guru.',
+        parsed.feedback || 'Dinilai otomatis berdasarkan kesesuaian kata kunci guru.',
       gradedBy: 'AI',
     };
   } catch (err) {

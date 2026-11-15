@@ -45,6 +45,7 @@ interface StudentExamRunnerProps {
   questions: Question[];
   accessToken?: string | null;
   examTimeSettings?: ExamTimeSettings;
+  showScoreImmediately?: boolean;
   onComplete: (submission: ExamSubmission) => void;
   onExit: () => void;
 }
@@ -63,9 +64,14 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
   questions,
   accessToken,
   examTimeSettings,
+  showScoreImmediately,
   onComplete,
   onExit,
 }) => {
+  const effectiveShowScoreImmediately =
+    showScoreImmediately !== undefined
+      ? showScoreImmediately
+      : examTimeSettings?.showScoreImmediately !== false;
   const isOnline = useOnlineStatus();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [flaggedIds, setFlaggedIds] = useState<string[]>([]);
@@ -180,7 +186,7 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
           durationSeconds: elapsedSeconds,
           endReason,
           isOnline,
-          deferAiToBackground: examTimeSettings?.showScoreImmediately === false,
+          deferAiToBackground: !effectiveShowScoreImmediately,
         });
 
         clearActiveAttempt(student.participantNumber, subject.id).catch(
@@ -202,7 +208,7 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
       subject,
       orderedQuestions,
       isOnline,
-      examTimeSettings?.showScoreImmediately,
+      effectiveShowScoreImmediately,
       onComplete,
     ]
   );
@@ -797,7 +803,7 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
                       ? 'Benar / Salah (AKM)'
                       : currentQuestion.type === 'MENJODOHKAN'
                       ? 'Menjodohkan (AKM)'
-                      : 'Isian / Uraian (Koreksi AI)'}
+                      : 'Isian / Uraian'}
                   </span>
                   <span aria-hidden="true">·</span>
                   <span>{currentQuestion.akmDomain}</span>
@@ -1216,7 +1222,7 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
                 {currentQuestion.type === 'ISIAN' && (
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-2">
-                      Tulis jawaban singkat / uraian Anda dengan jelas (akan dinilai otomatis oleh Asisten AI):
+                      Tulis jawaban singkat / uraian Anda dengan jelas:
                     </label>
                     <textarea
                       rows={5}
@@ -1541,7 +1547,7 @@ export const StudentExamRunner: React.FC<StudentExamRunnerProps> = ({
         open={confirmSubmitOpen}
         title="Kirim Jawaban & Akhiri Ujian?"
         description={
-          examTimeSettings?.showScoreImmediately === false
+          !effectiveShowScoreImmediately
             ? `Anda telah menjawab ${answeredCount} dari ${orderedQuestions.length} soal. Setelah dikirim, jawaban Anda langsung disimpan ke sistem dan pengawas.`
             : `Anda telah menjawab ${answeredCount} dari ${orderedQuestions.length} soal. Setelah dikirim, jawaban segera disimpan dan hasil ujian langsung ditampilkan.`
         }
